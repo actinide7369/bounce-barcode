@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Bounce Barcode: check a ball's pressure from the sound of its bounces</title>
-<meta name="description" content="A phone web app that listens to a ball bouncing, measures the gaps between bounce sounds, works out how bouncy the ball is (coefficient of restitution), and places the drop against reference balls measured with a pressure gauge. Built for ED5518 Project 2, Challenge 5, IIT Madras.">
+<title>Bounce Barcode: tell balls apart by the sound of their bounces</title>
+<meta name="description" content="A phone web app that listens to a ball bouncing, measures the gaps between bounce sounds, works out how bouncy the ball is (coefficient of restitution), and identifies which of a set of known reference balls a new drop came from. Built for ED5518 Project 2, Challenge 5, IIT Madras.">
 <meta name="theme-color" content="#13213a">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23e0582a'/%3E%3Cpath d='M16 2v28M2 16h28M7 6c5 6 5 14 0 20M25 6c-5 6-5 14 0 20' stroke='%2313213a' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
 <style>:root{
@@ -195,25 +195,51 @@ table.rec th{color:var(--ink-2);font-weight:600}
 <section class="view" id="v-home" aria-labelledby="h-home"><div class="wrap">
   <div class="hero">
     <svg id="heroSvg" viewBox="0 0 360 210" role="img" aria-label="A ball bouncing lower each time on a wooden floor. Each landing prints a tick on a barcode below the floor."></svg>
-    <h1 id="h-home">Bounce Barcode<span class="sub">Drop a ball. Your phone listens to the bounces and shows how well pumped it is, next to balls measured with a pressure gauge.</span></h1>
+    <h1 id="h-home">Bounce Barcode<span class="sub">Drop a ball. Your phone listens to the bounces, measures how bouncy the ball is, and shows which known ball the drop matches.</span></h1>
   </div>
   <div class="banner" data-demo-banner>Example data is switched on. It is simulated. Switch it off on the Test tab.</div>
 
   <ol class="steps" aria-label="How to use it">
     <li><div><b>Put the phone down about a metre from the spot</b>Screen up, on the floor or a table. Use a hard floor such as tile or stone.</div></li>
     <li><div><b>Press Start, then let the ball fall from your mark</b>Let go without pushing or spinning it. Keep still until it stops bouncing.</div></li>
-    <li><div><b>See where your orange barcode fits</b>A pumped ball keeps more of each bounce, so its barcode runs longer and its score is higher.</div></li>
+    <li><div><b>See where your orange barcode fits</b>A bouncier ball keeps more of each bounce, so its barcode runs longer and its score is higher.</div></li>
   </ol>
   <div class="btnrow">
     <a class="btn ball" href="#check">Check a ball</a>
     <a class="btn ghost" href="#compare">Look at test recordings</a>
   </div>
   <p class="small">No ball nearby? <a href="#test">Check the app with a test bounce sound</a> played from a laptop or another phone.</p>
-  <div class="key" aria-label="Colour key"><span><i class="sw o"></i>Orange is always your recording</span><span><i class="sw g"></i>Grey are reference balls at known pressure</span></div>
+  <div class="key" aria-label="Colour key"><span><i class="sw o"></i>Orange is always your recording</span><span><i class="sw g"></i>Grey are reference drops of known balls</span></div>
+
+  <div class="panel">
+    <h3>The experiment in four steps</h3>
+    <ol class="tight">
+      <li>Plan: pick the conditions to tell apart (here, three different balls marked A, B and C), one floor spot and one drop height, and lock them before any drop.</li>
+      <li>References: drop each ball several times and save the drops. They become the grey rows, the answer key.</li>
+      <li>Held-out tests: drop the balls again in an order drawn at random from a cup, and save them as tests. The app hides which ball each one was.</li>
+      <li>Readers: someone who has never seen the project looks at each test drop on the Compare tab and picks the ball. Their answers are checked against the truth file.</li>
+    </ol>
+    <p class="small">Why keep tests separate: the references are the answer key, the tests are the exam. Quizzing people on drops that built the key would prove nothing. Drawing the order from a cup stops slow changes (warming balls, a steadier hand) from looking like differences between balls.</p>
+  </div>
+
+  <div class="panel">
+    <h3>What has been done</h3>
+    <div id="statusBody"></div>
+  </div>
+
+  <div class="panel">
+    <h3>If you are grading this</h3>
+    <ol class="tight">
+      <li>Watch the one-minute video: the marked balls, the drop from the taped mark, the app's result.</li>
+      <li>Open <a href="#compare">Compare</a>. For each test code, look at where the orange barcode matches the grey rows and pick the ball. Or press Start reader test to run it as a timed quiz. Check the picks against c5_test_truth.csv.</li>
+      <li>Try it yourself: <a href="#check">Check</a> with any ball (hard floor, phone about 1 m away), or the one-tap self-tests on <a href="#test">Test</a> if you have no ball.</li>
+      <li>Read <a href="#about">About</a> for the physics, how labels are known, limits and the ED5518 course links.</li>
+    </ol>
+  </div>
 
   <div class="panel flat">
     <h3>What it measures</h3>
-    <p>Each time a ball lands it keeps a fraction of its speed. That fraction is called the coefficient of restitution, and here it is called the bounciness score. Because flight time follows speed, every gap between bounce sounds is the previous gap times that same fraction. The app times the gaps to about a millisecond and works out the score. More air pressure means a springier ball and a higher score.</p>
+    <p>Each time a ball lands it keeps a fraction of its speed. That fraction is called the coefficient of restitution, and here it is called the bounciness score. Because flight time follows speed, every gap between bounce sounds is the previous gap times that same fraction. The app times the gaps to about a millisecond and works out the score. Balls differ in this score through their air pressure and build: more air means a springier ball and a higher score.</p>
     <p class="small">Made for ED5518 Data Visualization for Engineers (IIT Madras), Project 2, Challenge 5: measure a real physical condition with a phone and make a visual that helps someone identify it. See <a href="#about">About</a> for the method, labels, limits and course links.</p>
   </div>
 </div></section>
@@ -221,7 +247,7 @@ table.rec th{color:var(--ink-2);font-weight:600}
 <!-- ================= CHECK ================= -->
 <section class="view" id="v-check" aria-labelledby="h-check"><div class="wrap">
   <h2 id="h-check">Check a ball</h2>
-  <p class="lede">Which pressure is this ball closest to?</p>
+  <p class="lede">How bouncy is this ball, and which known ball does it match?</p>
   <div class="banner" data-demo-banner>Example data is switched on. The references are simulated.</div>
 
   <details class="panel flat" id="setupBox" open>
@@ -261,7 +287,8 @@ table.rec th{color:var(--ink-2);font-weight:600}
 <!-- ================= COMPARE ================= -->
 <section class="view" id="v-compare" aria-labelledby="h-compare"><div class="wrap">
   <h2 id="h-compare">Test recordings</h2>
-  <p class="lede">Drops kept apart from the references. Pick one and decide which pressure it came from.</p>
+  <p class="lede">The quiz. Drops kept apart from the references, with their answers hidden. Pick one and decide which ball it came from.</p>
+  <div class="panel flat"><p class="note">How to answer: the grey rows are reference drops, one row per ball. The orange barcode is the test drop, repeated in every row. Pick the row where the orange ticks line up with the grey ones; the score strip below shows the same thing as numbers. The true answers are in c5_test_truth.csv in the submission, not in this page.</p></div>
   <div class="banner" data-demo-banner>Example data is switched on. These recordings are simulated.</div>
   <div class="panel flat">
     <label class="f" for="srcSel">Recordings to use</label>
@@ -272,7 +299,7 @@ table.rec th{color:var(--ink-2);font-weight:600}
   <div class="panel" id="testPanel"><p class="note">Pick a test recording above.</p></div>
   <div class="panel flat">
     <h3>Run a reader test</h3>
-    <p class="note">For a blind test with someone new. They see a 30 second guide, then each test recording in random order, and pick a pressure. Their answers are copied at the end. The true pressures are not in this page.</p>
+    <p class="note">For a blind test with someone new. They see a 30 second guide, then each test recording in random order, and pick a ball. Their answers are copied at the end. The true answers are not in this page.</p>
     <div class="btnrow"><button class="btn primary" id="rtStart" type="button">Start reader test</button></div>
   </div>
 </div></section>
@@ -340,14 +367,14 @@ table.rec th{color:var(--ink-2);font-weight:600}
   <p class="lede">Make your own reference set, save held-out test drops and download the data.</p>
   <div class="panel">
     <h3>Plan, set before recording</h3>
-    <p class="note">Choose the pressure levels, ball, floor and drop height before the first drop. Lock the plan so it can't drift while you record.</p>
-    <label class="f" for="pLevels">Pressure levels (gauge readings, comma separated)</label>
-    <input id="pLevels" type="text" placeholder="for example 0.1 bar, 0.3 bar, 0.6 bar">
+    <p class="note">Write the conditions you will tell apart, what they are, how you know each label, the floor and the drop height, before the first drop. Lock the plan so it can't drift while you record.</p>
+    <label class="f" for="pLevels">Conditions (comma separated)</label>
+    <input id="pLevels" type="text" placeholder="for example Ball A, Ball B, Ball C">
     <div class="grid2">
-      <div><label class="f" for="pBall">Ball</label><input id="pBall" type="text" placeholder="e.g. size 7 basketball"></div>
+      <div><label class="f" for="pBall">What they are</label><input id="pBall" type="text" placeholder="e.g. A white volleyball, B football, C old volleyball"></div>
       <div><label class="f" for="pFloor">Floor</label><input id="pFloor" type="text" placeholder="e.g. vitrified tile"></div>
       <div><label class="f" for="pHeight">Drop height, cm (to ball bottom)</label><input id="pHeight" type="number" inputmode="decimal" placeholder="e.g. 100"></div>
-      <div><label class="f" for="pGauge">Pressure gauge</label><input id="pGauge" type="text" placeholder="e.g. digital gauge"></div>
+      <div><label class="f" for="pGauge">How each label is known</label><input id="pGauge" type="text" placeholder="e.g. ball marked A, B or C with tape, shown on video"></div>
     </div>
     <div class="btnrow"><button class="btn primary small" id="pLock" type="button">Lock plan</button></div>
     <p class="small" id="pStatus"></p>
@@ -373,54 +400,54 @@ table.rec th{color:var(--ink-2);font-weight:600}
 <!-- ================= ABOUT ================= -->
 <section class="view" id="v-about" aria-labelledby="h-about"><div class="wrap prose">
   <h2 id="h-about">About this app</h2>
-  <p class="lede">The question it answers: which pump pressure is this ball closest to, judged only by the sound of its bounces?</p>
+  <p class="lede">The question it answers: which of a set of known balls did this drop come from, judged only by the sound of its bounces?</p>
 
   <div class="panel flat">
     <h3>Summary for AI readers</h3>
     <ul class="tight">
-      <li>Purpose: classify a ball's inflation pressure from a phone microphone recording of it bouncing.</li>
+      <li>Purpose: identify which known ball (condition) a new drop came from, using a phone microphone recording of it bouncing. Balls differ in bounciness through air pressure and build.</li>
       <li>Sensor: microphone through the browser (Web Audio), Android and iPhone, nothing installed.</li>
       <li>Measured feature: coefficient of restitution e from the gaps between bounce sounds (gap ratio), shown as the bounciness score.</li>
-      <li>Label: pressure gauge reading taken before each drop, filmed.</li>
+      <li>Conditions: three different balls marked A, B and C, fixed in a locked plan. Label: which ball was dropped, known before the drop and visible on video. Test drops were dropped in an order drawn from a cup.</li>
       <li>Visual: barcode comparator (unknown drawn in every reference row) plus a score strip with reference ranges.</li>
       <li>Test without a ball: Test tab, one-tap self-tests and a known-bounce sound.</li>
     </ul>
   </div>
 
   <h3>Who it's for</h3>
-  <p>Coaches and sports-room staff who check balls before a game. Basketball rules define a correctly pumped ball by how high it rebounds, and every ball is printed with its recommended pressure. A gauge is not always at hand; a phone usually is.</p>
+  <p>Coaches and sports-room staff sorting balls before a game: is this one as lively as the match ball, or one of the soft ones? Basketball rules define a correctly pumped ball by how high it rebounds, so bounciness is the property that matters, and a phone is always at hand.</p>
 
   <h3>How it works</h3>
   <p>When a ball lands it keeps a fraction <i>e</i> of its speed. Time in the air is proportional to speed, so each gap between bounce sounds is <i>e</i> times the gap before:</p>
   <p class="formula">gap<sub>n+1</sub> = e × gap<sub>n</sub></p>
-  <p>The app filters out hum and rumble, finds the sharp start of each bounce sound, and accepts only sounds with a broadband click, as an impact makes. It then picks the run of sounds whose gaps shrink steadily, ignoring stray knocks, and fits a straight line to log(gap) against bounce number over the first six gaps. The slope gives <i>e</i>, shown as the bounciness score. The score uses timing only; loudness matters just for whether each bounce is heard. A ball with more air is springier and loses less energy per bounce, so its score is higher. Allen and Allen measured a basketball going from 0.41 when flat to 0.87 at 13 psi. Very soft balls (score below about 0.5) give too few bounces to measure.</p>
+  <p>The app filters out hum and rumble, finds the sharp start of each bounce sound, and accepts only sounds with a broadband click, as an impact makes. It then picks the run of sounds whose gaps shrink steadily, ignoring stray knocks, and fits a straight line to log(gap) against bounce number over the first six gaps. The slope gives <i>e</i>, shown as the bounciness score. The score uses timing only; loudness matters just for whether each bounce is heard. A ball with more air is springier and loses less energy per bounce, so its score is higher; the build of the ball matters too. Allen and Allen measured one basketball going from 0.41 when flat to 0.87 at 13 psi. Very soft balls (score below about 0.5) give too few bounces to measure.</p>
   <p>Drop height changes the first gap but not the ratio between gaps. The barcode is scaled so the first gap is always one unit, and it shows only the bounces used for the score, so drops from slightly different heights and in noisier rooms still line up. The score drifts a little with impact speed, so the drop height stays fixed.</p>
 
   <h3>How to read the picture</h3>
   <ul class="tight">
-    <li>Bounce rhythm: one row per reference pressure. Grey lines are reference drops, one tick per bounce. The drop being judged is orange, repeated in every row, with faint orange guides through the grey. Find the row where they match. A soft ball gives a short, bunched barcode; a well pumped one runs longer.</li>
-    <li>Bounciness score: every drop is a dot on one shared scale. Grey dots are references, grouped by pressure. The orange line is the drop being judged. The shaded regions are the app's own rule, each group's range split halfway between neighbouring groups, so a reader using them is using the picture plus that rule.</li>
+    <li>Bounce rhythm: one row per reference ball. Grey lines are reference drops, one tick per bounce. The drop being judged is orange, repeated in every row, with faint orange guides through the grey. Find the row where they match. A soft ball gives a short, bunched barcode; a bouncy one runs longer.</li>
+    <li>Bounciness score: every drop is a dot on one shared scale. Grey dots are references, grouped by ball. The orange line is the drop being judged. The shaded regions are the app's own rule, each group's range split halfway between neighbouring groups, so a reader using them is using the picture plus that rule.</li>
   </ul>
 
   <h3>How the labels are made</h3>
-  <p>The pressure levels, ball, floor and drop height are fixed in a plan before any recording (the app's Data tab locks it, and PLAN.md is committed to the website's repository). Each drop is labelled by a pressure gauge reading taken just before it, filmed in the same shot. A new setup means letting air out and pumping back to the level; repeated drops on one setup are not counted as independent. Held-out test recordings come from a separate session, never feed the reference ranges, carry opaque IDs, and are listed in shuffled order. Their true pressures go in a separate file, c5_test_truth.csv, which is kept off this website.</p>
+  <p>The conditions (three balls marked A, B and C), the floor spot and the drop height are fixed in a plan before any recording; the app's Data tab locks it, and PLAN.md is in the website's repository. The label of each drop is simply which ball was dropped, decided before the drop and visible on the video, so it does not depend on the app at all. Held-out test drops come after the references, in an order drawn from a cup, never feed the reference rows, carry opaque codes and are listed in shuffled order. Their true conditions go in c5_test_truth.csv, which is kept off this website. An optional extra check measures each ball's pressure without a gauge: press the ball onto paper with a known weight and measure the wet footprint; pressure is about weight divided by footprint area.</p>
   <p class="small" id="pubLine"></p>
 
   <h3>Uncertainty and what can go wrong</h3>
   <ul class="tight">
-    <li>Each score comes with a spread from the fit. The honest uncertainty is the spread between repeated setups at one pressure, which the grey dots show.</li>
-    <li>Floor type changes the score by about as much as a small pressure step, so references only apply to the same floor, ball and drop height.</li>
-    <li>A cold ball has lower pressure and bounces lower. Let it reach room temperature.</li>
+    <li>Each score comes with a spread from the fit. The honest uncertainty is the spread between repeated drops of one ball, which the grey dots show.</li>
+    <li>Floor type changes the score a lot, so references only apply to the same floor, balls and drop height.</li>
+    <li>A cold ball has lower pressure and bounces lower, and balls slowly lose air. Record references and tests in one sitting at room temperature.</li>
     <li>Spin, a sideways drop or the ball hitting a wall breaks the steady shrink. The app checks for this and refuses.</li>
     <li>Background noise can hide quiet late bounces, and a person knocking with steadily shrinking gaps can look like a ball. Setting the drop height in the plan lets the app catch the second case.</li>
     <li>iPhone browsers may still apply some audio processing. Timing survives it, which is why the score uses only timing.</li>
-    <li>Treat the result as a match to the nearest reference group. A gauge is still the true reading.</li>
+    <li>The result is a match to the nearest reference ball. Two balls with almost the same bounciness cannot be told apart this way.</li>
   </ul>
   <p>A drop that fails any check gets No reading with the reason and the fix. On our synthetic attack set of about 450 recordings (stray knocks, ringing balls, hum, reverb, knocks with no ball), 5 knock-only recordings still got a score; every clean drop was read correctly. Refused drops are logged on the Data tab and exported as failure cases.</p>
 
   <h3>For graders</h3>
   <ul class="tight">
-    <li>Credible physical evidence: gauge reading filmed before each drop; plan locked before recording; known-bounce and tape checks of the method.</li>
+    <li>Credible physical evidence: marked balls and the drop from a taped mark on video; plan locked before recording; known-bounce and tape checks of the method; CSV of every drop with its bounce times.</li>
     <li>Readers on held-out recordings: Compare tab and reader test; test recordings from a separate session with opaque, shuffled IDs; the truth file is kept off the website.</li>
     <li>Repeatable, with uncertainty and failures: anyone can build their own reference set with their ball on the Data tab; self-tests on the Test tab; refusal rules; held-out accuracy with a Wilson interval on the Data tab; logged failed drops.</li>
     <li>Submitted files: measurement CSV, this page as the visual, c5_test_truth.csv, a video of under a minute, and a note on how labels are known.</li>
@@ -431,12 +458,12 @@ table.rec th{color:var(--ink-2);font-weight:600}
     <li>Decision first (Week 4) and a verdict in under 10 seconds (Week 8): one question, one score, the reference group it falls in. The 10 second target is checked in the reader test.</li>
     <li>Position on a common scale (Week 2, Cleveland and McGill): every drop is a position on one shared axis, and all barcodes share one time axis. No dials or colour-only verdicts.</li>
     <li>One highlight colour against grey (Week 2): orange is always the drop being judged.</li>
-    <li>The right comparison group (Week 3, Challenger): each drop is shown against every pressure at once, never against one level alone.</li>
-    <li>Tested envelope versus required envelope (Week 5, midsem Q11): the grey ranges are the tested envelope on this floor. The basketball rule's rebound band was set on a different floor, so it is not drawn on the chart.</li>
+    <li>The right comparison group (Week 3, Challenger): each drop is shown against every ball at once, never against one alone.</li>
+    <li>Tested envelope versus required envelope (Week 5, midsem Q11): the grey ranges are the tested envelope on this floor. A rule book's rebound band was set on a different floor, so it is not drawn on the chart.</li>
     <li>Refuse beyond the evidence (Week 5, Draupner) and sensors have their own envelopes (Week 6): uneven, noisy or too-short drops get No reading, and scores outside the reference range are flagged.</li>
     <li>Every summary is a selection (Week 7): the score ignores loudness and temperature on purpose, and the limits above say so.</li>
     <li>Verification (Week 9): self-tests, known-bounce sounds, a tape check of drop height, held-out recordings from another session, a blind reader test with new people, and the app rule's held-out accuracy with a Wilson interval.</li>
-    <li>Visual comparison research: the unknown is drawn inside every reference row (juxtaposition plus superposition, Gleicher et al. 2011; L'Yi et al. 2020). All pressures are visible together, since contrast between categories helps people learn them (Hatala et al. 2003; Carvalho and Goldstone 2014). Labelled regions on a number line follow Zikmund-Fisher et al. 2017.</li>
+    <li>Visual comparison research: the unknown is drawn inside every reference row (juxtaposition plus superposition, Gleicher et al. 2011; L'Yi et al. 2020). All conditions are visible together, since contrast between categories helps people learn them (Hatala et al. 2003; Carvalho and Goldstone 2014). Labelled regions on a number line follow Zikmund-Fisher et al. 2017.</li>
   </ul>
 
   <h3>Sources</h3>
@@ -810,7 +837,7 @@ if (typeof module !== 'undefined') module.exports = BounceCore;
 </script>
 <script>(() => {
 'use strict';
-const VER = '1.1.0';
+const VER = '1.2.0';
 const B = BounceCore;
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -883,7 +910,7 @@ function svgWrap(inner, w, h, title) {
 // Bounce rhythm comparator: one row per reference level, unknown drawn in every row
 function barcodeChart(unk, L, W) {
   const c = C(), padL = 76, padR = 14, plotW = W - padL - padR;
-  const rows = L.length ? L : [{ label: unk ? 'Your drop' : 'No data', items: [] }];
+  const rows = L.length ? L : [{ label: unk ? 'Drop' : 'No data', items: [] }];
   // draw only the impacts used for the score, so barcode length depends on bounciness, not on room noise
   const fitted = it => (it.scaled || []).slice(0, (it.nGaps || 6) + 1);
   let xmax = 3;
@@ -1011,7 +1038,7 @@ function comparatorHTML(unk, src, opts = {}) {
   const id = 'cmp' + Math.random().toString(36).slice(2, 7);
   const html = `
     <div class="charthead"><h3>Bounce rhythm</h3></div>
-    <p class="chartnote">Each tick is one bounce. Grey rows are reference balls at known pressure. Orange is ${opts.who || 'your drop'}, repeated in every row. Find the row where they match.</p>
+    <p class="chartnote">Each tick is one bounce. Grey rows are reference drops of known balls. Orange is ${opts.who || 'your drop'}, repeated in every row. Find the row where they match.</p>
     <div class="chart" data-chart="barcode" id="${id}a"></div>
     <div class="charthead" style="margin-top:14px"><h3>Bounciness score</h3></div>
     <p class="chartnote">Every drop is a dot on one shared scale. The shaded regions are the app's own rule: each group's range, split halfway between neighbouring groups.</p>
@@ -1031,13 +1058,13 @@ function comparatorHTML(unk, src, opts = {}) {
 function barcodeOnlyHTML(unk, src, opts) {
   const L = src ? B.levels(src.refs) : [];
   const id = 'cmp' + Math.random().toString(36).slice(2, 7);
-  return { html: `<div class="charthead"><h3>Bounce rhythm</h3></div><p class="chartnote">Each tick is one bounce. Grey rows are reference balls at known pressure. Orange is ${opts.who || 'your drop'}, repeated in every row. Find the row where they match.</p><div class="chart" id="${id}a"></div>`,
+  return { html: `<div class="charthead"><h3>Bounce rhythm</h3></div><p class="chartnote">Each tick is one bounce. Grey rows are reference drops of known balls. Orange is ${opts.who || 'your drop'}, repeated in every row. Find the row where they match.</p><div class="chart" id="${id}a"></div>`,
     draw: root => { const a = root.querySelector('#' + id + 'a'); const bc = barcodeChart(unk, L, widthOf(a)); a.innerHTML = svgWrap(bc.inner, bc.w, bc.h, 'Bounce rhythm comparator'); } };
 }
 function savePicture(bc, st, name) {
   const c = C(), W = bc.w, head = 46, H = head + bc.h + 30 + st.h + 10;
   const inner = `<rect width="${W}" height="${H}" fill="${c.surface}"/>
-    <text x="10" y="28" font-family="${CFONT}" font-weight="800" font-size="22" fill="${c.ink}">Bounce Barcode: which pressure is this ball closest to?</text>
+    <text x="10" y="28" font-family="${CFONT}" font-weight="800" font-size="22" fill="${c.ink}">Bounce Barcode: which ball is this drop closest to?</text>
     <g transform="translate(0,${head})">${bc.inner}</g>
     <text x="10" y="${head + bc.h + 22}" font-family="${CFONT}" font-weight="800" font-size="17" fill="${c.ink}">Bounciness score</text>
     <g transform="translate(0,${head + bc.h + 30})">${st.inner}</g>`;
@@ -1310,37 +1337,36 @@ function newTestId() {
 function renderSave(r, meta) {
   const lv = protocolLevels(), p = S.local.protocol || {};
   const lastRec = S.local.recordings[S.local.recordings.length - 1] || {};
-  if (!lv.length) { $('#saveBody').innerHTML = `<p class="note">First set your pressure levels on the <a href="#data">Data tab</a>, so every drop is saved against a level fixed in advance.</p>`; return; }
+  if (!lv.length) { $('#saveBody').innerHTML = `<p class="note">First write your conditions (for example Ball A, Ball B, Ball C) on the <a href="#data">Data tab</a> and lock the plan, so every drop is saved against a condition fixed in advance.</p>`; return; }
   $('#saveBody').innerHTML = `
     <label class="f">Use this drop as</label>
     <div class="seg" id="svKind"><button type="button" data-v="reference" aria-pressed="true">Reference</button><button type="button" data-v="test">Held-out test</button></div>
+    <p class="small">Reference = part of the answer key (grey rows). Held-out test = a quiz question: its condition is hidden from the Compare tab and kept in the truth file.</p>
     <div class="grid2">
-      <div><label class="f" for="svLevel">Pressure level</label><select id="svLevel">${lv.map(l => `<option ${l === lastRec.label ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
-      <div><label class="f" for="svGauge">Gauge reading now</label><input id="svGauge" type="number" step="0.01" inputmode="decimal" placeholder="0.30"></div>
-      <div><label class="f" for="svUnit">Unit</label><select id="svUnit"><option>bar</option><option>psi</option><option>kPa</option></select></div>
-      <div><label class="f" for="svSetup">Setup number (new after re-pumping)</label><input id="svSetup" type="number" inputmode="numeric" value="${(lastRec.setup || 0) + 0}"></div>
+      <div><label class="f" for="svLevel">Condition (which ball)</label><select id="svLevel">${lv.map(l => `<option ${l === lastRec.label ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
       <div><label class="f" for="svSession">Session</label><input id="svSession" type="text" value="${esc(lastRec.session || 'S1')}"></div>
-      <div><label class="f" for="svNote">Note</label><input id="svNote" type="text" placeholder="optional"></div>
+      <div><label class="f" for="svGauge">Measured value (optional)</label><input id="svGauge" type="number" step="0.01" inputmode="decimal" placeholder="e.g. gauge or footprint"></div>
+      <div><label class="f" for="svUnit">Unit</label><select id="svUnit"><option>bar</option><option>psi</option><option>kPa</option><option>none</option></select></div>
     </div>
-    <div class="btnrow"><button class="btn primary" id="svBtn" type="button">Save drop</button></div>
-    <p class="small">Same setup = another drop without changing the air. New setup = let air out, pump back to the level, read the gauge.</p>`;
+    <label class="f" for="svNote">Note (optional)</label><input id="svNote" type="text" placeholder="e.g. slip drawn from cup">
+    <div class="btnrow"><button class="btn primary" id="svBtn" type="button">Save drop</button></div>`;
   let kind = 'reference';
   $$('#svKind button').forEach(b => b.onclick = () => { kind = b.dataset.v; $$('#svKind button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   $('#svBtn').onclick = () => {
-    const label = $('#svLevel').value, gauge = parseFloat($('#svGauge').value);
-    if (!isFinite(gauge)) { toast('Type the gauge reading first. It is the label.'); return; }
+    const label = $('#svLevel').value, gv = parseFloat($('#svGauge').value), gauge = isFinite(gv) ? gv : null;
+    const setup = S.local.recordings.filter(x => x.label === label).length + 1;
     const rec = {
       id: kind === 'test' ? newTestId() : 'R' + (S.local.recordings.filter(x => x.kind === 'reference').length + 1).toString().padStart(3, '0'),
-      kind, label, pressure: parsePressure(label), gauge, gaugeUnit: $('#svUnit').value,
-      setup: parseInt($('#svSetup').value || '0', 10), session: $('#svSession').value.trim(), note: $('#svNote').value.trim(),
-      ball: p.ball || '', floor: p.floor || '', dropHeightCm: p.height || '', createdAt: S.last.at, source: meta.source, file: meta.file || '',
+      kind, label, pressure: parsePressure(label), gauge, gaugeUnit: gauge === null ? '' : $('#svUnit').value,
+      setup, session: $('#svSession').value.trim(), note: $('#svNote').value.trim(),
+      ball: p.ball || '', floor: p.floor || '', dropHeightCm: p.height || '', labelMethod: p.label || '', createdAt: S.last.at, source: meta.source, file: meta.file || '',
       e: r.e, eSE: r.eSE, r2: r.r2, eA: r.eA, eB: r.eB, nGaps: r.nGaps, impacts: r.impacts, used: r.used, scaled: r.scaled,
       rebound1Cm: r.rebound1 * 100, dropEstCm: r.dropEst * 100, snrDb: r.snrDb, clipped: r.clipped,
       sampleRate: r.sampleRate, settings: meta.settings || {}, app: VER
     };
     S.local.recordings.push(rec); saveLocal();
     if (!S.src || S.src === 'demo') S.src = 'phone';
-    toast(`Saved ${rec.id}: ${kind === 'test' ? 'held-out test' : 'reference'}, ${label}, setup ${rec.setup}`);
+    toast(`Saved ${rec.id}: ${kind === 'test' ? 'held-out test' : 'reference'}, ${label}`);
     $('#savePanel').open = false;
   };
 }
@@ -1383,13 +1409,13 @@ function rtClose() { $('#rt').classList.remove('on'); document.body.style.overfl
 function rtIntro() {
   $('#rtBody').innerHTML = `
     <h2 id="rtTitle">Reader test</h2>
-    <p class="lede">A ball was dropped and the phone heard its bounces. Your job: say which pump pressure it was at.</p>
+    <p class="lede">A ball was dropped and the phone heard its bounces. Your job: say which of the reference balls it was.</p>
     <div class="panel">
       <h3>How to read it (30 seconds)</h3>
       <ul class="tight">
-        <li>Each tick is one bounce. Grey rows are reference balls at known pressures.</li>
+        <li>Each tick is one bounce. Grey rows are reference drops, one row per ball.</li>
         <li>The orange barcode is the mystery drop, repeated in every row. Pick the row where the orange ticks line up with the grey ones.</li>
-        <li>Soft ball: short, bunched barcode and a low score. Well pumped ball: long barcode and a high score.</li>
+        <li>A soft ball gives a short, bunched barcode and a low score. A bouncy ball gives a longer barcode and a higher score.</li>
         <li>If shown, the score scale below places the drop among the reference groups.</li>
       </ul>
     </div>
@@ -1409,7 +1435,7 @@ function rtItem() {
   const cmp = comparatorHTML(t, RT.src, { who: 'the mystery drop', markLabel: 'Mystery drop', noSave: true, noStrip: RT.layout === 'barcode' });
   $('#rtBody').innerHTML = `
     <p class="small">Recording ${RT.i + 1} of ${RT.items.length}</p>
-    <h2 id="rtTitle" style="font-size:24px">Which pressure was this ball at?</h2>
+    <h2 id="rtTitle" style="font-size:24px">Which ball was this?</h2>
     <div class="cover" id="rtCover"><div class="panel" style="margin-top:8px">${cmp.html}</div><div class="coverlay">Time is up. Choose your answer below.</div></div>
     <div class="answers" role="group" aria-label="Answer">${RT.levels.map(l => `<button class="btn ghost" type="button" data-a="${esc(l)}">${esc(l)}</button>`).join('')}</div>
     <div class="conf">How sure? <div class="seg" id="rtConf"><button type="button" data-v="1">Guess</button><button type="button" data-v="2">Fairly</button><button type="button" data-v="3">Very</button></div></div>
@@ -1479,7 +1505,7 @@ function wilson(k, n, z = 1.96) { if (!n) return [0, 0]; const p = k / n, d = 1 
 function makeDemo() {
   const rnd = (() => { let s = 12345; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
   const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
-  const lv = [['0.1 bar', 0.62], ['0.3 bar', 0.76], ['0.6 bar', 0.83]];
+  const lv = [['Ball A', 0.62], ['Ball B', 0.76], ['Ball C', 0.83]];
   const references = [], tests = [];
   const al = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   for (const [label, em] of lv) {
@@ -1493,7 +1519,7 @@ function makeDemo() {
       else tests.push({ ...base, id: 'X' + Array.from({ length: 3 }, () => al[Math.floor(rnd() * al.length)]).join('') });
     }
   }
-  return { protocol: { levels: lv.map(l => l[0]).join(', '), ball: 'simulated', floor: 'simulated' }, references, tests: shuffle(tests) };
+  return { protocol: { levels: lv.map(l => l[0]).join(', '), ball: 'simulated', floor: 'simulated', label: 'simulated' }, references, tests: shuffle(tests) };
 }
 $('#demoBtn').addEventListener('click', () => {
   if (S.demo) { S.demo = null; if (S.src === 'demo') S.src = null; toast('Example data switched off'); }
@@ -1505,15 +1531,15 @@ $('#demoBtn').addEventListener('click', () => {
 /* ---------------- data tab ---------------- */
 function renderData() {
   const p = S.local.protocol || {}, locked = !!p.lockedAt;
-  $('#pLevels').value = p.levels || ''; $('#pBall').value = p.ball || ''; $('#pFloor').value = p.floor || ''; $('#pHeight').value = p.height || ''; $('#pGauge').value = p.gauge || '';
+  $('#pLevels').value = p.levels || ''; $('#pBall').value = p.ball || ''; $('#pFloor').value = p.floor || ''; $('#pHeight').value = p.height || ''; $('#pGauge').value = p.label || '';
   ['pLevels', 'pBall', 'pFloor', 'pHeight', 'pGauge'].forEach(id => $('#' + id).disabled = locked);
   $('#pLock').textContent = locked ? 'Unlock plan' : 'Lock plan';
   $('#pStatus').textContent = locked ? `Locked on ${new Date(p.lockedAt).toLocaleString()}. Unlocking is recorded.` : (p.unlockedAt ? `Unlocked on ${new Date(p.unlockedAt).toLocaleString()}.` : 'Not locked yet.');
   const recs = S.local.recordings, lv = protocolLevels();
-  const cnt = (kind, l) => { const rs = recs.filter(r => r.kind === kind && r.label === l); return `${new Set(rs.map(r => r.session + '/' + r.setup)).size} setups, ${rs.length} drops`; };
-  $('#countsPanel').innerHTML = lv.length ? `<h3>Progress</h3><div class="tablewrap"><table class="rec"><thead><tr><th>Level</th><th>References</th><th>Held-out tests</th></tr></thead><tbody>${lv.map(l => `<tr><td>${esc(l)}</td><td>${cnt('reference', l)}</td><td>${cnt('test', l)}</td></tr>`).join('')}</tbody></table></div>` : '<h3>Progress</h3><p class="note">Set your pressure levels above to start.</p>';
+  const cnt = (kind, l) => { const rs = recs.filter(r => r.kind === kind && r.label === l); return `${rs.length} drop${rs.length === 1 ? '' : 's'}`; };
+  $('#countsPanel').innerHTML = lv.length ? `<h3>Progress</h3><div class="tablewrap"><table class="rec"><thead><tr><th>Condition</th><th>References</th><th>Held-out tests</th></tr></thead><tbody>${lv.map(l => `<tr><td>${esc(l)}</td><td>${cnt('reference', l)}</td><td>${cnt('test', l)}</td></tr>`).join('')}</tbody></table></div>` : '<h3>Progress</h3><p class="note">Write your conditions above to start.</p>';
   $('#countsPanel').innerHTML += accuracyHTML();
-  $('#recTable').innerHTML = recs.length ? `<table class="rec"><thead><tr><th>ID</th><th>Use</th><th>Level</th><th>Gauge</th><th>Score</th><th>Setup</th><th></th></tr></thead><tbody>${[...recs].reverse().map(r => `<tr><td>${esc(r.id)}</td><td>${r.kind === 'test' ? 'test' : 'ref'}</td><td>${esc(r.label)}</td><td>${r.gauge} ${esc(r.gaugeUnit)}</td><td>${fmt(r.e)}</td><td>${esc(r.session)}/${r.setup}</td><td><button class="chip" type="button" data-del="${esc(r.id)}" aria-label="Delete ${esc(r.id)}">Delete</button></td></tr>`).join('')}</tbody></table>` : '<p class="note">No drops saved yet. Drop a ball on the Check tab, then open Save this drop.</p>';
+  $('#recTable').innerHTML = recs.length ? `<table class="rec"><thead><tr><th>ID</th><th>Use</th><th>Condition</th><th>Measured</th><th>Score</th><th>Session</th><th></th></tr></thead><tbody>${[...recs].reverse().map(r => `<tr><td>${esc(r.id)}</td><td>${r.kind === 'test' ? 'test' : 'ref'}</td><td>${esc(r.label)}</td><td>${r.gauge === null || r.gauge === undefined ? '-' : r.gauge + ' ' + esc(r.gaugeUnit)}</td><td>${fmt(r.e)}</td><td>${esc(r.session)}</td><td><button class="chip" type="button" data-del="${esc(r.id)}" aria-label="Delete ${esc(r.id)}">Delete</button></td></tr>`).join('')}</tbody></table>` : '<p class="note">No drops saved yet. Drop a ball on the Check tab, then open Save this drop.</p>';
   $$('[data-del]').forEach(b => b.onclick = () => { if (!confirmLite(b, 'Tap again to delete')) return; S.local.recordings = S.local.recordings.filter(r => r.id !== b.dataset.del); saveLocal(); renderData(); });
 }
 function accuracyHTML() {
@@ -1539,21 +1565,21 @@ $('#pLock').addEventListener('click', () => {
   const p = S.local.protocol || (S.local.protocol = {});
   if (p.lockedAt) { p.unlockedAt = new Date().toISOString(); p.lockHistory = (p.lockHistory || []).concat([{ unlocked: p.unlockedAt }]); delete p.lockedAt; }
   else {
-    Object.assign(p, { levels: $('#pLevels').value.trim(), ball: $('#pBall').value.trim(), floor: $('#pFloor').value.trim(), height: $('#pHeight').value.trim(), gauge: $('#pGauge').value.trim() });
-    if (!protocolLevels().length) { toast('Type at least two pressure levels first.'); return; }
+    Object.assign(p, { levels: $('#pLevels').value.trim(), ball: $('#pBall').value.trim(), floor: $('#pFloor').value.trim(), height: $('#pHeight').value.trim(), label: $('#pGauge').value.trim() });
+    if (!protocolLevels().length) { toast('Type at least two conditions first, for example Ball A, Ball B, Ball C.'); return; }
     p.lockedAt = new Date().toISOString(); p.lockHistory = (p.lockHistory || []).concat([{ locked: p.lockedAt }]);
   }
   saveLocal(); renderData();
 });
 ['pLevels', 'pBall', 'pFloor', 'pHeight', 'pGauge'].forEach(id => $('#' + id).addEventListener('change', () => {
   const p = S.local.protocol || (S.local.protocol = {}); if (p.lockedAt) return;
-  p[{ pLevels: 'levels', pBall: 'ball', pFloor: 'floor', pHeight: 'height', pGauge: 'gauge' }[id]] = $('#' + id).value.trim(); saveLocal();
+  p[{ pLevels: 'levels', pBall: 'ball', pFloor: 'floor', pHeight: 'height', pGauge: 'label' }[id]] = $('#' + id).value.trim(); saveLocal();
 }));
-const CSVCOLS = ['id', 'kind', 'label', 'pressure_bar_nominal', 'gauge', 'gauge_unit', 'session', 'setup', 'created_at', 'ball', 'floor', 'drop_height_cm', 'score_e', 'score_se', 'fit_r2', 'e_early', 'e_late', 'n_gaps_used', 'impact_times_s', 'gaps_used_s', 'rebound1_cm', 'drop_est_cm', 'loudest_db_above_floor', 'clipped', 'source', 'file', 'sample_rate', 'echo_cancellation', 'noise_suppression', 'auto_gain', 'user_agent', 'note', 'app_version'];
+const CSVCOLS = ['id', 'kind', 'condition', 'pressure_bar_nominal', 'measured_value', 'measured_unit', 'session', 'drop_no', 'created_at', 'ball', 'floor', 'drop_height_cm', 'label_method', 'score_e', 'score_se', 'fit_r2', 'e_early', 'e_late', 'n_gaps_used', 'impact_times_s', 'gaps_used_s', 'rebound1_cm', 'drop_est_cm', 'loudest_db_above_floor', 'clipped', 'source', 'file', 'sample_rate', 'echo_cancellation', 'noise_suppression', 'auto_gain', 'user_agent', 'note', 'app_version'];
 function csvCell(v) { if (v === null || v === undefined) return ''; const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 $('#exCsv').addEventListener('click', () => {
   const rows = [CSVCOLS.join(',')];
-  for (const r of S.local.recordings) rows.push([r.id, r.kind, r.label, r.pressure, r.gauge, r.gaugeUnit, r.session, r.setup, r.createdAt, r.ball, r.floor, r.dropHeightCm, r.e?.toFixed(5), r.eSE?.toFixed(5), r.r2?.toFixed(5), r.eA?.toFixed(4), r.eB?.toFixed(4), r.nGaps, (r.impacts || []).map(v => v.toFixed(5)).join(';'), (r.used || []).map(v => v.toFixed(5)).join(';'), r.rebound1Cm?.toFixed(1), r.dropEstCm?.toFixed(1), r.snrDb?.toFixed(1), r.clipped, r.source, r.file, r.sampleRate, r.settings?.echoCancellation, r.settings?.noiseSuppression, r.settings?.autoGainControl, r.settings?.ua, r.note, r.app].map(csvCell).join(','));
+  for (const r of S.local.recordings) rows.push([r.id, r.kind, r.label, r.pressure, r.gauge, r.gaugeUnit, r.session, r.setup, r.createdAt, r.ball, r.floor, r.dropHeightCm, r.labelMethod, r.e?.toFixed(5), r.eSE?.toFixed(5), r.r2?.toFixed(5), r.eA?.toFixed(4), r.eB?.toFixed(4), r.nGaps, (r.impacts || []).map(v => v.toFixed(5)).join(';'), (r.used || []).map(v => v.toFixed(5)).join(';'), r.rebound1Cm?.toFixed(1), r.dropEstCm?.toFixed(1), r.snrDb?.toFixed(1), r.clipped, r.source, r.file, r.sampleRate, r.settings?.echoCancellation, r.settings?.noiseSuppression, r.settings?.autoGainControl, r.settings?.ua, r.note, r.app].map(csvCell).join(','));
   for (const f of (S.local.refusals || [])) rows.push(CSVCOLS.map(c => c === 'kind' ? 'refused' : c === 'created_at' ? f.at : c === 'source' ? f.source : c === 'note' ? 'failed checks: ' + f.reasons + '; impacts heard: ' + f.heard : c === 'app_version' ? f.app : '').map(csvCell).join(','));
   download(rows.join('\n'), 'c5_bounce_measurements.csv', 'text/csv');
 });
@@ -1566,8 +1592,9 @@ $('#exSite').addEventListener('click', () => {
   download(JSON.stringify(out, null, 1), 'bounce_data.json', 'application/json');
 });
 $('#exTruth').addEventListener('click', () => {
-  const rows = ['recording_id,true_condition,gauge_reading,gauge_unit,session,setup,label_method'];
-  for (const r of S.local.recordings.filter(x => x.kind === 'test')) rows.push([r.id, r.label, r.gauge, r.gaugeUnit, r.session, r.setup, 'pressure gauge read just before the drop, filmed'].map(csvCell).join(','));
+  const rows = ['recording_id,true_condition,measured_value,measured_unit,session,label_method'];
+  const lm = (S.local.protocol || {}).label || 'condition fixed before the drop';
+  for (const r of S.local.recordings.filter(x => x.kind === 'test')) rows.push([r.id, r.label, r.gauge ?? '', r.gaugeUnit || '', r.session, r.labelMethod || lm].map(csvCell).join(','));
   download(rows.join('\n'), 'c5_test_truth.csv', 'text/csv');
 });
 $('#imJson').addEventListener('change', async ev => {
@@ -1652,7 +1679,24 @@ function route() {
 window.addEventListener('hashchange', route);
 let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(rerenderCharts, 150); });
 
+function renderStatus() {
+  const el = $('#statusBody'); if (!el) return;
+  const P = S.published, prot = (P && P.protocol) || {};
+  if (!P) {
+    el.innerHTML = `<p>No recordings are published on this website yet. Once the student uploads them, this box lists what was done. Meanwhile you can try every screen with the example data on the Test tab, or measure your own ball on the Check tab.</p>`;
+    return;
+  }
+  const L = B.levels(P.references.map(toRef));
+  const lock = prot.lockedAt ? new Date(prot.lockedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+  el.innerHTML = `<ol class="tight">
+    <li>Plan fixed${lock ? ' and locked on ' + esc(lock) : ''} before recording. Conditions: <b>${esc(prot.levels || L.map(l => l.label).join(', '))}</b>.${prot.ball ? ' What they are: ' + esc(prot.ball) + '.' : ''} Floor: ${esc(prot.floor || 'one marked spot')}. Drop height: ${esc(prot.height || '-')} cm.</li>
+    <li>Labels: ${esc(prot.label || 'the condition of each drop was fixed before it was dropped')}.</li>
+    <li>Reference drops (the grey rows, the answer key): ${P.references.length} in total, ${L.map(l => esc(l.label) + ' ' + l.items.length).join(', ')}.</li>
+    <li>Held-out test drops (the quiz): ${(P.tests || []).length}, recorded after the references in shuffled order and never used to draw the grey rows. They carry codes like ${esc(((P.tests || [])[0] || {}).id || 'T7KQ')}; their true conditions are only in c5_test_truth.csv in the submission.</li>
+  </ol>`;
+}
 function pubLine() {
+  renderStatus();
   const el = $('#pubLine'); if (!el) return;
   el.textContent = S.published ? `Published set on this website: ${S.published.references.length} reference drops and ${(S.published.tests || []).length} held-out test recordings.` : 'No recordings are published on this website yet. Until then you can make your own on the Data tab, or try the example data on the Test tab.';
 }

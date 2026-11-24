@@ -1,43 +1,40 @@
-# Plan, fixed before recording (fill in, then commit before the first real drop)
+# Plan, fixed before recording
 
-Committed on: ____ (the GitHub commit time is the public timestamp)
+Fill in the blanks, lock the same plan on the app's Data tab, and upload this file before the first real drop. The GitHub commit time is the public timestamp.
 
 ## Question
-Which pump pressure is this ball at, judged only from the sound of its bounces?
+Which of three known balls did a drop come from, judged only by the sound of its bounces?
 
 ## Conditions (chosen before testing)
-- Ball: ____ (printed recommended pressure: ____)
-- Levels, by gauge reading: 0.1 bar, 0.3 bar, 0.6 bar (stay inside the range printed on the ball)
-- Tolerance when pumping: ± 0.02 bar of the level
-- Floor: ____ (one marked spot)
-- Drop height: 100 cm to the bottom of the ball, from a taped mark, released not thrown
-- Phone position: on the floor, about 1 m from the spot, screen up
+- Ball A: ____ (marked "A" with tape)
+- Ball B: ____ (marked "B")
+- Ball C: ____ (marked "C")
+- Balls are used as they are; no air is added or let out during the experiment.
+
+## Fixed setup
+- Floor: ____ (one taped spot)
+- Drop height: 100 cm from the floor to the bottom of the ball, from a taped mark on the wall; released, not thrown
+- Phone: on the floor, about 1 m from the spot, screen up, same phone throughout: ____
 
 ## Labels
-- Instrument: ____ gauge, resolution ____
-- Read the gauge right before each setup, in the same video shot as the ball
-- A setup = let air out, pump back to the level, read the gauge. Then 3 drops on that setup.
+- The label is which ball was dropped. It is decided before each drop and the tape mark is visible on video.
+- Optional extra: footprint pressure of each ball (ball pressed onto paper under a known weight, wet patch measured with a ruler; pressure about weight / patch area).
 
 ## Recordings and split
-- Reference sessions S1 (Android phone) and S2 (iPhone): 3 setups per level each, 3 drops per setup
-- Held-out sessions S3 (Android) and S4 (iPhone), on a different day: 4 setups per level each, 1 drop per setup saved as a held-out test
-- Order inside each session: shuffled cards drawn on camera; every level appears equally; redraw if one level bunches up
-- Held-out recordings are never used to set reference ranges or thresholds
+- Session S1, references: 6 drops per ball, saved as Reference. These become the grey rows.
+- Break of at least 20 minutes.
+- Session S2, held-out tests: 4 drops per ball (12 total), order drawn from a cup of 12 slips (4 A, 4 B, 4 C), saved as Held-out test.
+- Test drops are never used to draw the reference rows.
 
 ## Feature and rule (frozen)
-- Feature: bounciness score e = exp(slope of ln(gap) against gap number), first six gaps of at least 45 ms
-- App rule: nearest group, with boundaries halfway between neighbouring group medians, set from reference sessions only
-- Refusal: fewer than 4 bounces, gaps not shrinking steadily (fit below 0.97 or any gap ratio outside 0.3 to 1.05), early and late halves differing by more than 0.08
+- Feature: bounciness score e = exp(slope of ln(gap) against gap number), first six gaps of at least 45 ms.
+- App rule: nearest ball group, boundaries halfway between neighbouring group medians, set from references only.
+- Refusal ("No reading"): too few bounces, gaps not shrinking steadily, early and late bounces disagreeing, loose fit, implausible drop height, audio dropout.
 
 ## Expected confusion
-Neighbouring levels (0.3 vs 0.6 bar), because the score flattens at higher pressure.
-
-## Nuisance factors
-- Fixed: ball, floor spot, drop height, phone distance
-- Varied on purpose across sessions: phone model (Android and iPhone), time of day
-- Logged: room temperature, any fan or noise
+The two balls with the closest bounciness.
 
 ## Reporting
-- App accuracy on held-out sessions: confusion matrix of counts (true level by app answer, plus Refused), with Wilson 95% intervals, Android and iPhone separately
-- Reader test: 8 to 10 new readers, forced choice, optional confidence, time per answer
-- Failure cases recorded separately: a different floor, a different drop height, a cold ball, a spun drop, a hand-held phone
+- App rule on the held-out tests: count correct, Wilson 95% interval, confusion table (Data tab).
+- Failed drops ("No reading") counted and listed as failure cases.
+- Optional: a short reader test with people who have not seen the project.

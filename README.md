@@ -1,6 +1,6 @@
 # Bounce Barcode
 
-A phone web app that checks how well a ball is pumped from the sound of its bounces.
+A phone web app that tells balls apart by how bouncy they are, measured from the sound of their bounces.
 
 Open it in Chrome or Safari on any phone: **https://actinide7369.github.io/bounce-barcode/** (link live once uploaded to GitHub Pages).
 
@@ -17,21 +17,30 @@ When a ball lands it keeps a fraction e of its speed (the coefficient of restitu
 5. fits a straight line to log(gap) against gap number over the first six gaps; the slope gives e,
 6. refuses to score when too few bounces are heard, the gaps don't shrink steadily, early and late bounces disagree, the fit is loose, the implied drop height doesn't fit, or audio dropped out.
 
-More air pressure makes the ball springier, so e rises with pressure. The score uses timing only; loudness matters just for whether each bounce is heard.
+More air pressure makes a ball springier, so e rises with pressure; the ball's build matters too. The score uses timing only; loudness matters just for whether each bounce is heard.
 
 ## The visual
 
-- **Bounce rhythm (barcode comparator).** One row per reference pressure. Grey ticks are reference drops, one tick per bounce. The recording being judged is orange and repeated in every row. Time is scaled by the first gap, so drop height cancels out.
-- **Bounciness score strip.** Every drop is a dot on one shared axis. Reference ranges are shaded and labelled, split halfway between neighbouring groups. The judged recording is one orange line.
+- **Bounce rhythm (barcode comparator).** One row per reference ball. Grey ticks are reference drops, one tick per bounce. The recording being judged is orange and repeated in every row. Time is scaled by the first gap, so drop height cancels out.
+- **Bounciness score strip.** Every drop is a dot on one shared axis. Reference ranges for each ball are shaded and labelled, split halfway between neighbouring groups. The judged recording is one orange line.
 
 Orange always means the recording being judged; grey always means references.
 
-## Conditions and labels
+## The experiment
 
-- Conditions: one ball at fixed gauge pressures chosen before recording (see `PLAN.md`), one floor, one drop height.
-- Label: a pressure gauge reading taken just before each drop and filmed in the same shot.
-- Replicate: let air out and pump back to the level (a new setup). Repeat drops on one setup are not counted as independent.
-- Held-out test recordings come from a separate session, carry opaque IDs (like `T7KQ`), and are never used to draw the reference ranges. Their true pressures are in `c5_test_truth.csv`, which is in the submission ZIP and not on this website.
+1. **Plan (locked before any drop):** three different balls marked A, B and C, one floor spot, one drop height (100 cm), one phone position. See `PLAN.md`.
+2. **References:** each ball dropped several times and saved. These are the grey rows, the answer key.
+3. **Held-out tests:** the balls dropped again in an order drawn from a cup, saved as tests. The app hides which ball each was and gives them opaque codes (like `T7KQ`).
+4. **Readers:** someone new looks at each test drop on the Compare tab and picks the ball; picks are checked against `c5_test_truth.csv`, which is in the submission ZIP and not on this website.
+
+The label of each drop is which ball was dropped, decided before the drop and visible on the video, so it does not depend on the app. Balls differ in bounciness through their air pressure and build.
+
+## For graders
+
+1. Watch the one-minute video.
+2. Open the Compare tab; for each test code pick the ball whose grey row matches the orange barcode, or run the reader test. Check against `c5_test_truth.csv`.
+3. Try Check with any ball, or the one-tap self-tests on the Test tab.
+4. About explains the physics, labels, limits and course links.
 
 ## How to check it works
 
@@ -41,13 +50,14 @@ Orange always means the recording being judged; grey always means references.
 - **Self-tests:** Test tab, one tap each: a clean drop, a knock before the drop, a knock between bounces, only three bounces, and knocks with no ball, each with the expected result.
 - **Example data:** Test tab, simulated references and tests (clearly marked, never exported) to try every screen without a ball.
 
-Automated tests (Playwright, headless Chrome with a fake microphone) feed independent synthetic recordings through the real browser audio path: three pressures, a different drop height, a noisy room with speech, fan, hum, echo and reverb, a ringing ball, a knock before the drop, a slow drop after a stray sound, 44.1 kHz audio, plus silence and random knocks that must be refused (13 recordings, 26 of 26 passing over two repeats). A 24-step flow test covers file upload, the known-bounce sound, saving references and tests, the three exports (with no test labels in the site data), the reader test, the self-tests and the held-out accuracy panel. An attack set of about 450 synthetic recordings (stray knocks, ringing balls, hum, reverb, knocks with no ball) read every clean drop correctly; 5 knock-only recordings still got a score. All of this is on synthetic sound; the real-phone check is the known-bounce test and real drops.
+Automated tests (Playwright, headless Chrome with a fake microphone) feed independent synthetic recordings through the real browser audio path: three bounciness levels, a different drop height, a noisy room with speech, fan, hum, echo and reverb, a ringing ball, a knock before the drop, a slow drop after a stray sound, 44.1 kHz audio, plus silence and random knocks that must be refused (13 recordings, 26 of 26 passing over two repeats). A 24-step flow test covers file upload, the known-bounce sound, saving references and tests, the three exports (with no test labels in the site data), the reader test, the self-tests and the held-out accuracy panel. An attack set of about 450 synthetic recordings (stray knocks, ringing balls, hum, reverb, knocks with no ball) read every clean drop correctly; 5 knock-only recordings still got a score. All of this is on synthetic sound; the real-phone check is the known-bounce test and real drops.
 
 ## Files
 
 - `index.html`: the whole app (no external libraries, works offline once loaded).
 - `data/bounce_data.json`: published reference and test recordings (bounce times and scores only, no audio, no test labels).
 - `PLAN.md`: the plan fixed before recording.
+- `c5_test_truth.csv` (submission ZIP only): the true ball for each test code.
 
 ## Course links (ED5518)
 
