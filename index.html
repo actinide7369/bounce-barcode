@@ -1,0 +1,1672 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bounce Barcode: check a ball's pressure from the sound of its bounces</title>
+<meta name="description" content="A phone web app that listens to a ball bouncing, measures the gaps between bounce sounds, works out how bouncy the ball is (coefficient of restitution), and places the drop against reference balls measured with a pressure gauge. Built for ED5518 Project 2, Challenge 5, IIT Madras.">
+<meta name="theme-color" content="#13213a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23e0582a'/%3E%3Cpath d='M16 2v28M2 16h28M7 6c5 6 5 14 0 20M25 6c-5 6-5 14 0 20' stroke='%2313213a' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
+<style>:root{
+  color-scheme:light;
+  --bg:#f3f5f9; --surface:#ffffff; --surface-2:#e9edf4;
+  --ink:#13213a; --ink-2:#4b5875; --muted:#8a94a8; --ref:#9aa3b5; --line:#d7dde7;
+  --accent:#e0582a; --accent-ink:#b8401a; --accent-soft:#fbe3d8;
+  --wood:#e8c58f; --wood-2:#d6ab6c; --courtline:#2e5bd1;
+  --good:#0a7d0a; --warn:#a86a00; --bad:#c22f2f;
+  --radius-l:22px; --radius-m:14px; --radius-s:8px;
+  --display:"Avenir Next Condensed","Roboto Condensed","Arial Narrow","sans-serif-condensed",system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --bg:#0c1526; --surface:#132037; --surface-2:#1b2a45;
+    --ink:#e8eef8; --ink-2:#aab7cd; --muted:#7d8aa3; --ref:#6f7d97; --line:#26354f;
+    --accent:#f0703d; --accent-ink:#ff9a6e; --accent-soft:#3a2219;
+    --wood:#6b5130; --wood-2:#57411f; --courtline:#6f95ff;
+    --good:#3fc43f; --warn:#f2b33a; --bad:#ff7070;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0c1526; --surface:#132037; --surface-2:#1b2a45;
+  --ink:#e8eef8; --ink-2:#aab7cd; --muted:#7d8aa3; --ref:#6f7d97; --line:#26354f;
+  --accent:#f0703d; --accent-ink:#ff9a6e; --accent-soft:#3a2219;
+  --wood:#6b5130; --wood-2:#57411f; --courtline:#6f95ff;
+  --good:#3fc43f; --warn:#f2b33a; --bad:#ff7070;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body);padding-bottom:84px;overflow-x:hidden}
+a{color:var(--courtline)}
+h1,h2,h3{font-family:var(--display);font-stretch:condensed;line-height:1.08;margin:0}
+h1{font-size:44px;font-weight:800;letter-spacing:-.01em}
+h2{font-size:30px;font-weight:800}
+h3{font-size:20px;font-weight:700}
+p{margin:.5em 0}
+small,.small{font-size:13.5px;color:var(--ink-2)}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+:focus-visible{outline:3px solid var(--courtline);outline-offset:2px;border-radius:6px}
+
+/* top bar */
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;gap:10px;height:54px}
+.brand{white-space:nowrap;display:flex;align-items:center;gap:8px;font-family:var(--display);font-stretch:condensed;font-weight:800;font-size:22px;color:var(--ink);text-decoration:none}
+.brand svg{width:26px;height:26px}
+.spacer{flex:1}
+.iconbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;height:36px;min-width:36px;padding:0 10px;font:600 14px var(--body);cursor:pointer}
+
+/* views */
+.view{display:none;padding:18px 0 28px}
+.view.on{display:block}
+.view > .wrap > h2{margin:6px 0 4px}
+.lede{font-size:18px;color:var(--ink-2);max-width:60ch}
+
+/* hero */
+.hero{position:relative;margin:4px -16px 0;padding:18px 16px 4px;background:radial-gradient(120% 90% at 20% 0%,var(--surface) 0%,var(--bg) 70%)}
+.hero svg{display:block;width:100%;height:auto;max-height:280px}
+.hero h1{margin-top:6px}
+.hero h1 .sub{display:block;font-size:22px;font-weight:600;color:var(--ink-2);letter-spacing:0;margin-top:6px;font-family:var(--body);font-stretch:normal;line-height:1.35}
+.steps{list-style:none;padding:0;margin:18px 0;display:grid;gap:10px;counter-reset:s}
+.steps li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-m);padding:12px 14px}
+.steps li::before{content:counter(s);font-family:var(--display);font-stretch:condensed;font-weight:800;font-size:28px;line-height:36px;width:40px;height:40px;text-align:center;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink)}
+.steps b{display:block;font-size:16.5px}
+.key{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 2px;font-size:14px;color:var(--ink-2)}
+.key span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:18px;height:10px;border-radius:3px}
+.sw.o{background:var(--accent)} .sw.g{background:var(--ref)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:999px;padding:13px 20px;font:700 16px var(--body);cursor:pointer;text-decoration:none;min-height:48px}
+.btn.primary{background:var(--ink);color:var(--bg)}
+.btn.ball{background:var(--accent);color:#fff}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn.small{padding:8px 14px;min-height:38px;font-size:14px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.bigstart{width:100%;font-size:20px;min-height:64px}
+
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-l);padding:16px;margin:14px 0}
+.panel.flat{border-radius:var(--radius-m)}
+.panel h3{margin-bottom:4px}
+.panel .note{font-size:14px;color:var(--ink-2)}
+details.panel > summary{cursor:pointer;font-weight:700;list-style:none;display:flex;align-items:center;gap:8px}
+details.panel > summary::before{content:"";width:8px;height:8px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(-45deg);transition:transform .15s}
+details.panel[open] > summary::before{transform:rotate(45deg)}
+details.panel > summary::-webkit-details-marker{display:none}
+ul.tight{margin:.4em 0;padding-left:1.2em} ul.tight li{margin:.25em 0}
+
+/* listening */
+.listen{display:none}
+.listen.on{display:block}
+.livebox{position:relative;border-radius:var(--radius-m);background:var(--surface-2);overflow:hidden;height:120px;margin:10px 0}
+.livebox canvas{width:100%;height:100%;display:block}
+.livemsg{font:800 24px var(--display);font-stretch:condensed;margin:6px 0 0}
+.meter{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin:6px 0}
+.meter i{display:block;height:100%;width:0;background:var(--ink-2);transition:width .08s linear}
+
+/* score */
+.score{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:center}
+.score .num{font-family:var(--display);font-stretch:condensed;font-weight:800;font-size:72px;line-height:.9;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+.score .lab{font-size:14px;color:var(--ink-2)}
+.score .say{font-size:17px;font-weight:600}
+.status{display:flex;gap:10px;align-items:flex-start;border-radius:var(--radius-m);padding:12px 14px;margin:10px 0;font-weight:600}
+.status.bad{background:color-mix(in srgb,var(--bad) 12%,var(--surface));color:var(--ink)}
+.status.warn{background:color-mix(in srgb,var(--warn) 14%,var(--surface))}
+.status .ic{flex:none;width:22px;height:22px}
+.checks{list-style:none;padding:0;margin:8px 0}
+.checks li{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14.5px}
+.checks li:first-child{border-top:0}
+.checks .fix{display:block;color:var(--ink-2);font-size:13.5px}
+.tick{color:var(--good);font-weight:800} .cross{color:var(--bad);font-weight:800}
+
+/* charts */
+.chart{margin:8px 0 4px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.charthead{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.charthead h3{font-size:19px}
+.chartnote{font-size:13.5px;color:var(--ink-2);margin:2px 0 6px}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chip{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 13px;font:600 14px var(--body);cursor:pointer;min-height:38px}
+.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink);padding:8px 13px;font:600 14px var(--body);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+/* forms */
+label.f{display:block;font-size:14px;font-weight:600;margin:10px 0 4px}
+::placeholder{color:var(--muted);opacity:1}
+input[type=text],input[type=number],select,textarea{width:100%;font:16px var(--body);padding:10px 12px;border-radius:var(--radius-s);border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+table.rec{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+table.rec th,table.rec td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+table.rec th{color:var(--ink-2);font-weight:600}
+.tablewrap{overflow-x:auto}
+
+/* banner */
+.banner{display:none;background:repeating-linear-gradient(135deg,var(--accent-soft) 0 12px,var(--surface) 12px 24px);border:1.5px dashed var(--accent);border-radius:var(--radius-m);padding:10px 14px;margin:12px 0;font-weight:700;font-size:14.5px}
+.banner.on{display:block}
+
+/* tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.tabbar .wrap{display:grid;grid-template-columns:repeat(6,1fr);padding:0 4px}
+.tabbar a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 9px;font-size:11.5px;font-weight:600;color:var(--ink-2);text-decoration:none}
+.tabbar a svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabbar a[aria-current="page"]{color:var(--accent-ink)}
+
+/* reader test overlay */
+.overlay{position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto;display:none}
+.overlay.on{display:block}
+.overlay .wrap{padding-top:16px;padding-bottom:40px}
+.cover{position:relative}
+.cover.hidden .coverlay{display:flex}
+.coverlay{display:none;position:absolute;inset:0;background:var(--surface-2);border-radius:var(--radius-m);align-items:center;justify-content:center;font-weight:700;color:var(--ink-2);text-align:center;padding:20px}
+.answers{display:grid;gap:8px;margin:12px 0}
+.answers .btn{width:100%}
+.answers .btn[aria-pressed="true"]{background:var(--accent);color:#fff}
+.conf{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink-2)}
+
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+.prose h3{margin-top:18px}
+.prose p,.prose li{max-width:66ch}
+.formula{font-family:var(--display);font-stretch:condensed;font-size:22px;font-weight:700;background:var(--surface-2);border-radius:var(--radius-s);padding:8px 12px;display:inline-block}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (min-width:640px){h1{font-size:56px}.hero{margin:4px 0 0;border-radius:var(--radius-l)}}
+@media (max-width:380px){.brand{font-size:19px}.iconbtn{padding:0 8px}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <a class="brand" href="#home" aria-label="Bounce Barcode home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="var(--accent)"/><path d="M16 2v28M2 16h28M7 6c5 6 5 14 0 20M25 6c-5 6-5 14 0 20" stroke="var(--ink)" stroke-width="1.6" fill="none"/></svg>
+    Bounce Barcode
+  </a>
+  <span class="spacer"></span>
+  <button class="iconbtn" id="themeBtn" type="button" aria-label="Change light or dark theme">◐ Auto</button>
+</div></header>
+
+<main>
+<!-- ================= HOME ================= -->
+<section class="view" id="v-home" aria-labelledby="h-home"><div class="wrap">
+  <div class="hero">
+    <svg id="heroSvg" viewBox="0 0 360 210" role="img" aria-label="A ball bouncing lower each time on a wooden floor. Each landing prints a tick on a barcode below the floor."></svg>
+    <h1 id="h-home">Bounce Barcode<span class="sub">Drop a ball. Your phone listens to the bounces and shows how well pumped it is, next to balls measured with a pressure gauge.</span></h1>
+  </div>
+  <div class="banner" data-demo-banner>Example data is switched on. It is simulated. Switch it off on the Test tab.</div>
+
+  <ol class="steps" aria-label="How to use it">
+    <li><div><b>Put the phone down about a metre from the spot</b>Screen up, on the floor or a table. Use a hard floor such as tile or stone.</div></li>
+    <li><div><b>Press Start, then let the ball fall from your mark</b>Let go without pushing or spinning it. Keep still until it stops bouncing.</div></li>
+    <li><div><b>See where your orange barcode fits</b>A pumped ball keeps more of each bounce, so its barcode runs longer and its score is higher.</div></li>
+  </ol>
+  <div class="btnrow">
+    <a class="btn ball" href="#check">Check a ball</a>
+    <a class="btn ghost" href="#compare">Look at test recordings</a>
+  </div>
+  <p class="small">No ball nearby? <a href="#test">Check the app with a test bounce sound</a> played from a laptop or another phone.</p>
+  <div class="key" aria-label="Colour key"><span><i class="sw o"></i>Orange is always your recording</span><span><i class="sw g"></i>Grey are reference balls at known pressure</span></div>
+
+  <div class="panel flat">
+    <h3>What it measures</h3>
+    <p>Each time a ball lands it keeps a fraction of its speed. That fraction is called the coefficient of restitution, and here it is called the bounciness score. Because flight time follows speed, every gap between bounce sounds is the previous gap times that same fraction. The app times the gaps to about a millisecond and works out the score. More air pressure means a springier ball and a higher score.</p>
+    <p class="small">Made for ED5518 Data Visualization for Engineers (IIT Madras), Project 2, Challenge 5: measure a real physical condition with a phone and make a visual that helps someone identify it. See <a href="#about">About</a> for the method, labels, limits and course links.</p>
+  </div>
+</div></section>
+
+<!-- ================= CHECK ================= -->
+<section class="view" id="v-check" aria-labelledby="h-check"><div class="wrap">
+  <h2 id="h-check">Check a ball</h2>
+  <p class="lede">Which pressure is this ball closest to?</p>
+  <div class="banner" data-demo-banner>Example data is switched on. The references are simulated.</div>
+
+  <details class="panel flat" id="setupBox" open>
+    <summary>Before you drop</summary>
+    <ul class="tight">
+      <li>Phone about 1 m from the bounce spot, screen up, so the ball cannot hit it.</li>
+      <li>Drop from the same mark every time (for example 100 cm to the bottom of the ball). Let go, don't throw.</li>
+      <li>Hard floor, same spot each time. Carpet or a rug kills the bounces.</li>
+      <li>Quiet room. Stay still until the ball stops.</li>
+      <li>Open this page in Chrome or Safari. Links opened inside chat or mail apps often block the mic.</li>
+    </ul>
+  </details>
+
+  <div id="idle">
+    <button class="btn ball bigstart" id="startBtn" type="button">Start listening</button>
+    <div class="btnrow"><label class="btn ghost small" for="fileIn">Analyse a sound file instead</label><input id="fileIn" type="file" accept="audio/*,video/*,.wav,.m4a,.mp3,.aac,.ogg,.webm" hidden></div>
+    <div id="micErr"></div>
+  </div>
+
+  <div class="listen" id="listen" aria-live="polite">
+    <p class="livemsg" id="liveMsg">Listening. Drop the ball now.</p>
+    <div class="meter" aria-hidden="true"><i id="meterBar"></i></div>
+    <div class="livebox"><canvas id="liveCanvas" aria-label="Live sound level with a tick for each bounce heard"></canvas></div>
+    <p class="small" id="liveCount">Bounces heard: 0</p>
+    <button class="btn primary" id="stopBtn" type="button">Stop and analyse</button>
+  </div>
+
+  <div id="result" hidden>
+    <div class="panel" id="scorePanel"></div>
+    <div class="panel" id="comparePanel"></div>
+    <details class="panel flat" id="howPanel"><summary>How this score was worked out</summary><div id="howBody"></div></details>
+    <details class="panel flat" id="savePanel"><summary>Save this drop as a reference or test recording</summary><div id="saveBody"></div></details>
+    <div class="btnrow"><button class="btn ball" id="againBtn" type="button">Drop again</button></div>
+  </div>
+</div></section>
+
+<!-- ================= COMPARE ================= -->
+<section class="view" id="v-compare" aria-labelledby="h-compare"><div class="wrap">
+  <h2 id="h-compare">Test recordings</h2>
+  <p class="lede">Drops kept apart from the references. Pick one and decide which pressure it came from.</p>
+  <div class="banner" data-demo-banner>Example data is switched on. These recordings are simulated.</div>
+  <div class="panel flat">
+    <label class="f" for="srcSel">Recordings to use</label>
+    <select id="srcSel"></select>
+    <p class="small" id="srcNote"></p>
+  </div>
+  <div id="testChips" class="chips" role="group" aria-label="Test recordings"></div>
+  <div class="panel" id="testPanel"><p class="note">Pick a test recording above.</p></div>
+  <div class="panel flat">
+    <h3>Run a reader test</h3>
+    <p class="note">For a blind test with someone new. They see a 30 second guide, then each test recording in random order, and pick a pressure. Their answers are copied at the end. The true pressures are not in this page.</p>
+    <div class="btnrow"><button class="btn primary" id="rtStart" type="button">Start reader test</button></div>
+  </div>
+</div></section>
+
+<!-- ================= TEST ================= -->
+<section class="view" id="v-test" aria-labelledby="h-test"><div class="wrap">
+  <h2 id="h-test">Check the app hears bounces</h2>
+  <p class="lede">Three ways to confirm it works on your phone before you trust a reading.</p>
+
+  <div class="panel">
+    <h3>1. One-tap self-tests on this phone</h3>
+    <p class="note">These feed made-up bounce sounds straight into the analysis (no microphone) and show the result with what should happen. Use them to see a good reading and a refusal in seconds.</p>
+    <div class="btnrow">
+      <button class="btn ghost small" type="button" data-self="good">Clean drop (expect 0.75)</button>
+      <button class="btn ghost small" type="button" data-self="pre">Knock before the drop (expect 0.75)</button>
+      <button class="btn ghost small" type="button" data-self="mid">Knock between bounces (0.75 or No reading)</button>
+      <button class="btn ghost small" type="button" data-self="three">Only 3 bounces (expect No reading)</button>
+      <button class="btn ghost small" type="button" data-self="noball">No ball, random knocks (expect No reading)</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>2. Known-bounce check through the microphone</h3>
+    <p class="note">This checks the real microphone path. It plays a made-up bounce sound whose score you choose. Play it from a laptop or a second phone, about 30 cm from the phone running Check a ball. The reading should match the chosen score within 0.01.</p>
+    <label class="f">Score of the test sound</label>
+    <div class="seg" id="kbE" role="group" aria-label="Test score"><button type="button" data-v="0.60">0.60</button><button type="button" data-v="0.75" aria-pressed="true">0.75</button><button type="button" data-v="0.85">0.85</button></div>
+    <label class="f">Drop height it imitates</label>
+    <div class="seg" id="kbH" role="group" aria-label="Drop height"><button type="button" data-v="0.5">50 cm</button><button type="button" data-v="1.0" aria-pressed="true">100 cm</button><button type="button" data-v="1.5">150 cm</button></div>
+    <div class="btnrow"><button class="btn primary" id="kbPlay" type="button">Play test bounce</button><button class="btn ghost" id="kbSave" type="button">Download as sound file</button></div>
+    <p class="small">Order: press Start listening on the listening phone first, then Play here. You can also download the file and use Analyse a sound file on the Check tab.</p>
+  </div>
+
+  <div class="panel">
+    <h3>3. Tape check on a real drop</h3>
+    <p class="note">After each real drop the app estimates how high the ball was dropped from, using only the first gap. Measure your drop height with a tape. The two should agree within about 20% (real balls get slightly bouncier as they slow down, which pulls the estimate low). If you set a drop height in your plan, the app checks this itself and refuses drops that don't fit.</p>
+  </div>
+
+  <div class="panel">
+    <h3>4. If it doesn't hear the bounces</h3>
+    <ul class="tight">
+      <li>Level bar doesn't move: the mic is blocked. On iPhone, open Settings, then Safari (or Chrome), then Microphone, and set it to Allow or Ask. On Android, tap the icon left of the address, then Permissions, then Microphone, Allow.</li>
+      <li>Opened from a chat or mail app: use its menu to open the link in Chrome or Safari.</li>
+      <li>Bar moves but few ticks appear: put the phone 50 cm to 1 m away, drop onto tile or stone from about 1 m, and switch off fans.</li>
+      <li>Too loud warning: move the phone further away, to 1 to 2 m.</li>
+      <li>Heard one sound, then nothing: press Start first, walk to your mark, then drop. The app waits up to 20 seconds.</li>
+      <li>Still nothing: record the drop with a voice recorder and use Analyse a sound file on the Check tab. On iPhone, share the Voice Memo to Files first. Some Android recorders save .amr or .3gp, which browsers can't open; choose .m4a or .wav.</li>
+    </ul>
+  </div>
+
+  <div class="panel flat">
+    <h3>This phone</h3>
+    <div id="devInfo" class="small">Press Start listening once to see what the microphone reports.</div>
+  </div>
+
+  <div class="panel flat">
+    <h3>Example data</h3>
+    <p class="note">Simulated reference and test drops so you can try every screen without a ball. They are clearly marked and never exported.</p>
+    <div class="btnrow"><button class="btn ghost" id="demoBtn" type="button">Switch on example data</button></div>
+  </div>
+</div></section>
+
+<!-- ================= DATA ================= -->
+<section class="view" id="v-data" aria-labelledby="h-data"><div class="wrap">
+  <h2 id="h-data">Your recordings</h2>
+  <p class="lede">Make your own reference set, save held-out test drops and download the data.</p>
+  <div class="panel">
+    <h3>Plan, set before recording</h3>
+    <p class="note">Choose the pressure levels, ball, floor and drop height before the first drop. Lock the plan so it can't drift while you record.</p>
+    <label class="f" for="pLevels">Pressure levels (gauge readings, comma separated)</label>
+    <input id="pLevels" type="text" placeholder="for example 0.1 bar, 0.3 bar, 0.6 bar">
+    <div class="grid2">
+      <div><label class="f" for="pBall">Ball</label><input id="pBall" type="text" placeholder="e.g. size 7 basketball"></div>
+      <div><label class="f" for="pFloor">Floor</label><input id="pFloor" type="text" placeholder="e.g. vitrified tile"></div>
+      <div><label class="f" for="pHeight">Drop height, cm (to ball bottom)</label><input id="pHeight" type="number" inputmode="decimal" placeholder="e.g. 100"></div>
+      <div><label class="f" for="pGauge">Pressure gauge</label><input id="pGauge" type="text" placeholder="e.g. digital gauge"></div>
+    </div>
+    <div class="btnrow"><button class="btn primary small" id="pLock" type="button">Lock plan</button></div>
+    <p class="small" id="pStatus"></p>
+  </div>
+  <div class="panel flat" id="countsPanel"></div>
+  <div class="panel flat">
+    <h3>Saved drops on this phone</h3>
+    <div class="tablewrap" id="recTable"></div>
+  </div>
+  <div class="panel flat">
+    <h3>Download</h3>
+    <div class="btnrow">
+      <button class="btn ghost small" id="exCsv" type="button">All drops, CSV (with labels)</button>
+      <button class="btn ghost small" id="exSite" type="button">Site data, JSON (test labels removed)</button>
+      <button class="btn ghost small" id="exTruth" type="button">Test truth, CSV</button>
+    </div>
+    <label class="btn ghost small" for="imJson">Load a data file</label><input id="imJson" type="file" accept=".json,application/json" hidden>
+    <p class="small">Site data goes in <code>data/bounce_data.json</code> next to this page. The truth file stays out of the website and goes in the submission ZIP only.</p>
+    <div class="btnrow"><button class="btn ghost small" id="clearAll" type="button">Delete all drops on this phone</button></div>
+  </div>
+</div></section>
+
+<!-- ================= ABOUT ================= -->
+<section class="view" id="v-about" aria-labelledby="h-about"><div class="wrap prose">
+  <h2 id="h-about">About this app</h2>
+  <p class="lede">The question it answers: which pump pressure is this ball closest to, judged only by the sound of its bounces?</p>
+
+  <div class="panel flat">
+    <h3>Summary for AI readers</h3>
+    <ul class="tight">
+      <li>Purpose: classify a ball's inflation pressure from a phone microphone recording of it bouncing.</li>
+      <li>Sensor: microphone through the browser (Web Audio), Android and iPhone, nothing installed.</li>
+      <li>Measured feature: coefficient of restitution e from the gaps between bounce sounds (gap ratio), shown as the bounciness score.</li>
+      <li>Label: pressure gauge reading taken before each drop, filmed.</li>
+      <li>Visual: barcode comparator (unknown drawn in every reference row) plus a score strip with reference ranges.</li>
+      <li>Test without a ball: Test tab, one-tap self-tests and a known-bounce sound.</li>
+    </ul>
+  </div>
+
+  <h3>Who it's for</h3>
+  <p>Coaches and sports-room staff who check balls before a game. Basketball rules define a correctly pumped ball by how high it rebounds, and every ball is printed with its recommended pressure. A gauge is not always at hand; a phone usually is.</p>
+
+  <h3>How it works</h3>
+  <p>When a ball lands it keeps a fraction <i>e</i> of its speed. Time in the air is proportional to speed, so each gap between bounce sounds is <i>e</i> times the gap before:</p>
+  <p class="formula">gap<sub>n+1</sub> = e × gap<sub>n</sub></p>
+  <p>The app filters out hum and rumble, finds the sharp start of each bounce sound, and accepts only sounds with a broadband click, as an impact makes. It then picks the run of sounds whose gaps shrink steadily, ignoring stray knocks, and fits a straight line to log(gap) against bounce number over the first six gaps. The slope gives <i>e</i>, shown as the bounciness score. The score uses timing only; loudness matters just for whether each bounce is heard. A ball with more air is springier and loses less energy per bounce, so its score is higher. Allen and Allen measured a basketball going from 0.41 when flat to 0.87 at 13 psi. Very soft balls (score below about 0.5) give too few bounces to measure.</p>
+  <p>Drop height changes the first gap but not the ratio between gaps. The barcode is scaled so the first gap is always one unit, and it shows only the bounces used for the score, so drops from slightly different heights and in noisier rooms still line up. The score drifts a little with impact speed, so the drop height stays fixed.</p>
+
+  <h3>How to read the picture</h3>
+  <ul class="tight">
+    <li>Bounce rhythm: one row per reference pressure. Grey lines are reference drops, one tick per bounce. The drop being judged is orange, repeated in every row, with faint orange guides through the grey. Find the row where they match. A soft ball gives a short, bunched barcode; a well pumped one runs longer.</li>
+    <li>Bounciness score: every drop is a dot on one shared scale. Grey dots are references, grouped by pressure. The orange line is the drop being judged. The shaded regions are the app's own rule, each group's range split halfway between neighbouring groups, so a reader using them is using the picture plus that rule.</li>
+  </ul>
+
+  <h3>How the labels are made</h3>
+  <p>The pressure levels, ball, floor and drop height are fixed in a plan before any recording (the app's Data tab locks it, and PLAN.md is committed to the website's repository). Each drop is labelled by a pressure gauge reading taken just before it, filmed in the same shot. A new setup means letting air out and pumping back to the level; repeated drops on one setup are not counted as independent. Held-out test recordings come from a separate session, never feed the reference ranges, carry opaque IDs, and are listed in shuffled order. Their true pressures go in a separate file, c5_test_truth.csv, which is kept off this website.</p>
+  <p class="small" id="pubLine"></p>
+
+  <h3>Uncertainty and what can go wrong</h3>
+  <ul class="tight">
+    <li>Each score comes with a spread from the fit. The honest uncertainty is the spread between repeated setups at one pressure, which the grey dots show.</li>
+    <li>Floor type changes the score by about as much as a small pressure step, so references only apply to the same floor, ball and drop height.</li>
+    <li>A cold ball has lower pressure and bounces lower. Let it reach room temperature.</li>
+    <li>Spin, a sideways drop or the ball hitting a wall breaks the steady shrink. The app checks for this and refuses.</li>
+    <li>Background noise can hide quiet late bounces, and a person knocking with steadily shrinking gaps can look like a ball. Setting the drop height in the plan lets the app catch the second case.</li>
+    <li>iPhone browsers may still apply some audio processing. Timing survives it, which is why the score uses only timing.</li>
+    <li>Treat the result as a match to the nearest reference group. A gauge is still the true reading.</li>
+  </ul>
+  <p>A drop that fails any check gets No reading with the reason and the fix. On our synthetic attack set of about 450 recordings (stray knocks, ringing balls, hum, reverb, knocks with no ball), 5 knock-only recordings still got a score; every clean drop was read correctly. Refused drops are logged on the Data tab and exported as failure cases.</p>
+
+  <h3>For graders</h3>
+  <ul class="tight">
+    <li>Credible physical evidence: gauge reading filmed before each drop; plan locked before recording; known-bounce and tape checks of the method.</li>
+    <li>Readers on held-out recordings: Compare tab and reader test; test recordings from a separate session with opaque, shuffled IDs; the truth file is kept off the website.</li>
+    <li>Repeatable, with uncertainty and failures: anyone can build their own reference set with their ball on the Data tab; self-tests on the Test tab; refusal rules; held-out accuracy with a Wilson interval on the Data tab; logged failed drops.</li>
+    <li>Submitted files: measurement CSV, this page as the visual, c5_test_truth.csv, a video of under a minute, and a note on how labels are known.</li>
+  </ul>
+
+  <h3>How this maps to ED5518</h3>
+  <ul class="tight">
+    <li>Decision first (Week 4) and a verdict in under 10 seconds (Week 8): one question, one score, the reference group it falls in. The 10 second target is checked in the reader test.</li>
+    <li>Position on a common scale (Week 2, Cleveland and McGill): every drop is a position on one shared axis, and all barcodes share one time axis. No dials or colour-only verdicts.</li>
+    <li>One highlight colour against grey (Week 2): orange is always the drop being judged.</li>
+    <li>The right comparison group (Week 3, Challenger): each drop is shown against every pressure at once, never against one level alone.</li>
+    <li>Tested envelope versus required envelope (Week 5, midsem Q11): the grey ranges are the tested envelope on this floor. The basketball rule's rebound band was set on a different floor, so it is not drawn on the chart.</li>
+    <li>Refuse beyond the evidence (Week 5, Draupner) and sensors have their own envelopes (Week 6): uneven, noisy or too-short drops get No reading, and scores outside the reference range are flagged.</li>
+    <li>Every summary is a selection (Week 7): the score ignores loudness and temperature on purpose, and the limits above say so.</li>
+    <li>Verification (Week 9): self-tests, known-bounce sounds, a tape check of drop height, held-out recordings from another session, a blind reader test with new people, and the app rule's held-out accuracy with a Wilson interval.</li>
+    <li>Visual comparison research: the unknown is drawn inside every reference row (juxtaposition plus superposition, Gleicher et al. 2011; L'Yi et al. 2020). All pressures are visible together, since contrast between categories helps people learn them (Hatala et al. 2003; Carvalho and Goldstone 2014). Labelled regions on a number line follow Zikmund-Fisher et al. 2017.</li>
+  </ul>
+
+  <h3>Sources</h3>
+  <ul class="tight small">
+    <li>Allen and Allen, restitution of a basketball versus pressure: <a href="https://arxiv.org/abs/2202.03034">arXiv 2202.03034</a></li>
+    <li>Aguiar and Laudares, restitution from bounce sounds: <a href="https://arxiv.org/abs/physics/0210092">arXiv physics/0210092</a></li>
+    <li>FIBA Official Basketball Rules 2026, Equipment (rebound test and pressure marking): <a href="https://assets.fiba.basketball/image/upload/documents-corporate-fiba-official-rules-2026-equipment-v1-0.pdf">fiba.basketball</a></li>
+    <li>phyphox, Inelastic collision experiment: <a href="https://phyphox.org/expdb/a9bc91393d87df6ddaea56fbbc9d60b723b4e7cd/instructions/inelastic-collision">phyphox.org</a></li>
+    <li>Gleicher et al. 2011, Visual comparison for information visualization; L'Yi, Jo and Seo 2020: <a href="https://arxiv.org/abs/2009.00192">arXiv 2009.00192</a></li>
+    <li>Hatala, Brooks and Norman 2003, contrastive ECG practice; Carvalho and Goldstone 2014, Memory and Cognition</li>
+    <li>Zikmund-Fisher et al. 2017, number lines for lab results, JAMIA</li>
+  </ul>
+  <p class="small">App version <span id="appVer"></span>. Everything runs in your browser. Sound is analysed on the phone and never uploaded; saved drops keep only bounce times and scores, never audio.</p>
+</div></section>
+</main>
+
+<nav class="tabbar" aria-label="Sections"><div class="wrap">
+  <a href="#home" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</a>
+  <a href="#check" data-tab="check"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6 5.5c3 3.5 3 9.5 0 13M18 5.5c-3 3.5-3 9.5 0 13"/></svg>Check</a>
+  <a href="#compare" data-tab="compare"><svg viewBox="0 0 24 24"><path d="M4 5v14M7 5v14M11 5v14M14 5v14M16.5 5v14M18.5 5v14M20 5v14"/></svg>Compare</a>
+  <a href="#test" data-tab="test"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>Test</a>
+  <a href="#data" data-tab="data"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 14h16M10 9v11"/></svg>Data</a>
+  <a href="#about" data-tab="about"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>About</a>
+</div></nav>
+
+<div class="overlay" id="rt" role="dialog" aria-modal="true" aria-labelledby="rtTitle"><div class="wrap" id="rtBody"></div></div>
+<div class="toast" id="toast" role="status"></div>
+<noscript><p style="padding:16px">This app needs JavaScript to listen to the microphone.</p></noscript>
+<script>/* Bounce Barcode core: bounce detection, restitution fit, quality checks,
+   test-bounce synthesis and WAV encoding. No DOM access, so it can be unit-tested. */
+const BounceCore = (() => {
+  const G = 9.81;
+  const CFG = {
+    hpHz: 250,          // remove mains hum and its low harmonics, footsteps, handling rumble
+    hopMs: 1,           // envelope resolution
+    riseDb: 7,          // an impact must rise this many dB within about 10 ms
+    aboveFloorDb: 10,   // and stand this far above the noise floor
+    refractoryMs: 30,   // ignore echoes and the ball's own ring for this long
+    minFirstGap: 0.12,  // s, shortest plausible first flight
+    maxFirstGap: 2.2,   // s, about a 6 m rebound, far above any indoor drop
+    minGap: 0.045,      // s, below this the ball is chattering, not bouncing
+    maxImpacts: 16,
+    fitMaxGaps: 6,      // use the first six gaps for the score
+    minGaps: 3,         // need at least four impacts
+    minR2: 0.97,
+    halfTol: 0.08,
+    maxSE: 0.01,        // largest fit spread seen on clean drops was about 0.007
+    minDrop: 0.2, maxDrop: 3.0,  // m, plausible drop heights when no plan height is set
+    clickHz: 1500,      // high band used to confirm a broadband impact click
+    clickRiseDb: 5, clickAboveDb: 7
+  };
+
+  function highpass(x, sr, fc) {
+    // RBJ biquad high-pass, Q = 0.707 (bilinear transform, flat passband)
+    const w0 = 2 * Math.PI * fc / sr, cos = Math.cos(w0), alpha = Math.sin(w0) / (2 * 0.7071);
+    const b0 = (1 + cos) / 2, b1 = -(1 + cos), b2 = (1 + cos) / 2;
+    const a0 = 1 + alpha, a1 = -2 * cos, a2 = 1 - alpha;
+    const y = new Float32Array(x.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const xi = x[i];
+      const yi = (b0 * xi + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+      y[i] = yi; x2 = x1; x1 = xi; y2 = y1; y1 = yi;
+    }
+    return y;
+  }
+
+  function envelopeDb(y, sr) {
+    const hop = Math.max(1, Math.round(sr * CFG.hopMs / 1000));
+    const n = Math.floor(y.length / hop);
+    const e = new Float32Array(n);
+    for (let f = 0; f < n; f++) {
+      let s = 0; const o = f * hop;
+      for (let k = 0; k < hop; k++) { const v = y[o + k]; s += v * v; }
+      e[f] = s / hop;
+    }
+    // 3-frame max-hold keeps the sharp attack but steadies the level
+    const db = new Float32Array(n);
+    for (let f = 0; f < n; f++) {
+      const m = Math.max(e[f], f > 0 ? e[f - 1] : 0, f > 1 ? e[f - 2] : 0);
+      db[f] = 10 * Math.log10(m + 1e-12);
+    }
+    return { db, hop };
+  }
+
+  function percentile(arr, p) {
+    if (!arr.length) return -120;
+    const a = Array.from(arr).sort((u, v) => u - v);
+    return a[Math.min(a.length - 1, Math.max(0, Math.floor(p * (a.length - 1))))];
+  }
+
+  function candidates(y, sr, env, envHF, yh) {
+    // Onsets are found on the high band, where every impact makes a sharp broadband click.
+    // A ringing ball's beats and mains hum live in the low band, so they cannot trigger an onset.
+    // The main band only supplies the loudness used to rank sounds.
+    const { db, hop } = env, hf = envHF.db;
+    const floor = percentile(db, 0.2), floorHF = percentile(hf, 0.2);
+    const out = [];
+    const base = (arr, f) => { let b = 0; for (let k = f - 10; k <= f - 4; k++) b += arr[k]; return b / 7; };
+    let f = 12;
+    while (f < hf.length) {
+      const rise = hf[f] - base(hf, f);
+      if (rise >= CFG.clickRiseDb && hf[f] >= floorHF + CFG.clickAboveDb) {
+        let pk = hf[f], pf = f, pkMain = -200;
+        for (let k = f; k < Math.min(hf.length, f + 15); k++) { if (hf[k] > pk) { pk = hf[k]; pf = k; } if (db[k] > pkMain) pkMain = db[k]; }
+        out.push({ frame: f, time: refine(yh, sr, f * hop, hop), strength: Math.max(pk - floorHF, pkMain - floor), rise });
+        f = pf + Math.round(CFG.refractoryMs / CFG.hopMs);
+        continue;
+      }
+      f++;
+    }
+    return { list: out, floor, floorHF };
+  }
+
+  function refine(y, sr, idx, hop) {
+    // sample-level onset: first sample reaching 25% of the local peak
+    const a = Math.max(0, idx - 3 * hop), b = Math.min(y.length, idx + 15 * hop);
+    let p = 0;
+    for (let i = a; i < b; i++) { const v = Math.abs(y[i]); if (v > p) p = v; }
+    const thr = 0.25 * p;
+    for (let i = a; i < b; i++) if (Math.abs(y[i]) >= thr) return i / sr;
+    return idx / sr;
+  }
+
+  function grow(list, i0, i1) {
+    // extend a chain from two chosen impacts; each next gap must shrink steadily
+    const picked = [list[i0], list[i1]];
+    let ratio = null;
+    while (picked.length < CFG.maxImpacts) {
+      const lastC = picked[picked.length - 1], prev = picked[picked.length - 2];
+      const T = lastC.time - prev.time;
+      if (T < CFG.minGap) break;
+      const lo = lastC.time + 0.45 * T, hi = lastC.time + 1.03 * T;
+      const pred = lastC.time + (ratio || 0.8) * T;
+      let pick = null;
+      for (const c of list) {
+        if (c.time <= lo || c.time > hi) continue;
+        if (ratio === null) { if (!pick || c.strength > pick.strength) pick = c; }
+        else if (!pick || Math.abs(c.time - pred) < Math.abs(pick.time - pred)) pick = c;
+      }
+      if (!pick) break;
+      const newT = pick.time - lastC.time;
+      if (newT < CFG.minGap * 0.8) break;
+      picked.push(pick);
+      const r = newT / T;
+      ratio = ratio === null ? r : 0.5 * ratio + 0.5 * r;
+    }
+    return picked;
+  }
+
+  function chainScore(times, startPenalty = 0) {
+    const F = fit(times);
+    if (F.e === null) return { F, score: F.n };
+    let rms = 0;
+    for (let i = 0; i < F.n; i++) { const r = Math.log(F.used[i]) - (Math.log(F.used[0]) + i * Math.log(F.e)); rms += r * r; }
+    rms = Math.sqrt(rms / F.n);
+    // prefer more fitted gaps, then more impacts overall (so the first bounce is kept), then the cleanest fit
+    return { F, score: F.n + 0.15 * Math.min(times.length, 12) - 40 * rms - startPenalty };
+  }
+
+  function chain(list) {
+    // try every plausible start and first partner, keep the longest, cleanest chain
+    if (list.length < 2) return list.slice(0, list.length ? 1 : 0);
+    const maxS = Math.max(...list.map(c => c.strength));
+    let best = null, bestScore = -Infinity;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].strength < maxS - 20) continue;
+      const partners = [];
+      for (let j = i + 1; j < list.length; j++) {
+        const d = list[j].time - list[i].time;
+        if (d < CFG.minFirstGap) continue;
+        if (d > CFG.maxFirstGap) break;
+        partners.push(j);
+      }
+      partners.sort((a, b) => list[b].strength - list[a].strength);
+      for (const j of partners.slice(0, 4)) {
+        const ch = grow(list, i, j);
+        // the first impact is the fastest, so normally the loudest: penalise quiet starts
+        // and penalise loud sounds the chain leaves out, inside it or up to 2.2 s before it:
+        // a real bounce train leaves almost nothing out, a chain that skips bounces or starts late leaves many
+        const inCh = new Set(ch), t0 = ch[0].time - CFG.maxFirstGap, t1 = ch[ch.length - 1].time;
+        let left = 0;
+        for (const c of list) if (!inCh.has(c) && c.time > t0 && c.time < t1 && c.strength >= maxS - 15) left++;
+        const { score } = chainScore(ch.map(c => c.time), 0.15 * (maxS - list[i].strength) + 0.5 * left);
+        if (score > bestScore + 1e-9) { bestScore = score; best = ch; }
+      }
+    }
+    if (!best) {
+      const i = list.findIndex(c => c.strength >= maxS - 6);
+      return [list[i]];
+    }
+    return best;
+  }
+
+  function fit(times) {
+    const gaps = [];
+    for (let i = 1; i < times.length; i++) gaps.push(times[i] - times[i - 1]);
+    const used = [];
+    for (const g of gaps) { if (used.length >= CFG.fitMaxGaps) break; if (g < CFG.minGap) break; used.push(g); }
+    const n = used.length;
+    if (n < 2) return { gaps, used, n, e: null };
+    // least squares of ln(gap) against gap number
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    for (let i = 0; i < n; i++) { const yv = Math.log(used[i]); sx += i; sy += yv; sxx += i * i; sxy += i * yv; }
+    const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    const icept = (sy - slope * sx) / n;
+    let ssr = 0, sst = 0; const my = sy / n;
+    for (let i = 0; i < n; i++) { const yv = Math.log(used[i]); const f = icept + slope * i; ssr += (yv - f) ** 2; sst += (yv - my) ** 2; }
+    const r2 = sst > 0 ? 1 - ssr / sst : 1;
+    const ratios = [];
+    for (let i = 1; i < n; i++) ratios.push(used[i] / used[i - 1]);
+    const half = Math.ceil(ratios.length / 2);
+    const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+    const eA = ratios.length >= 2 ? mean(ratios.slice(0, half)) : null;
+    const eB = ratios.length >= 2 ? mean(ratios.slice(ratios.length - half)) : null;
+    const se = n > 2 ? Math.sqrt(ssr / (n - 2) / (sxx - sx * sx / n)) : null;
+    const e = Math.exp(slope);
+    return { gaps, used, n, e, r2, ratios, eA, eB, eSE: se !== null ? e * se : null };
+  }
+
+  function analyse(samples, sr, opts = {}) {
+    const y = highpass(samples, sr, CFG.hpHz);
+    const yh = highpass(highpass(samples, sr, CFG.clickHz), sr, CFG.clickHz);
+    let peakAbs = 0, clipped = 0;
+    for (let i = 0; i < samples.length; i++) { const v = Math.abs(samples[i]); if (v > peakAbs) peakAbs = v; if (v >= 0.995) clipped++; }
+    const env = envelopeDb(y, sr), envHF = envelopeDb(yh, sr);
+    const { list, floor } = candidates(y, sr, env, envHF, yh);
+    const picked = chain(list);
+    const times = picked.map(c => c.time);
+    const F = fit(times);
+    const checks = [];
+    const add = (id, ok, text, fix) => checks.push({ id, ok, text, fix: ok ? '' : fix });
+    const nImp = picked.length;
+    const clipFrac = clipped / Math.max(1, samples.length);
+    const floorDbfs = floor;   // background level of the filtered signal, dB re full scale
+    if (nImp === 1) add('heard', false, 'Heard one sound, then nothing that fits a bouncing ball',
+      'Press Start, get the ball to your mark, then drop it. Keep other sounds away while it bounces.');
+    else add('heard', nImp >= 1, nImp ? `Heard ${nImp} bounces in a row` : 'Heard no bounce',
+      floorDbfs > -40 ? 'The room is loud (fan, AC or hum). Turn it off or move somewhere quieter, then drop again.'
+        : 'Move the phone closer (about 1 m), drop onto a hard floor, and check the level bar jumps when the ball lands.');
+    const needGaps = (F.e !== null && F.e < 0.6) ? CFG.minGaps : CFG.minGaps + 1;
+    if (nImp >= 2) add('enough', F.n >= needGaps, `Used ${F.n} gaps between bounces (need ${needGaps})`,
+      floorDbfs > -40 ? 'Late, quiet bounces were lost in background noise. Turn off fans or AC and drop again.'
+        : 'Too few bounces were heard. Drop from about 1 m onto a hard floor and let the ball bounce until it stops.');
+    let ratiosOk = true;
+    if (F.ratios) for (const r of F.ratios) if (r < 0.3 || r > 1.05) ratiosOk = false;
+    let e1 = null, dropEst = null, rebound1 = null;
+    if (F.n >= CFG.minGaps) {
+      add('shrink', ratiosOk && F.r2 >= CFG.minR2, `Gaps shrink steadily (fit ${F.r2.toFixed(3)})`,
+        'The gaps did not shrink evenly. Release the ball without spin and keep hands and feet still.');
+      if (F.eA !== null) add('halves', Math.abs(F.eA - F.eB) <= CFG.halfTol,
+        `Early and late bounces agree (${F.eA.toFixed(2)} and ${F.eB.toFixed(2)})`,
+        'Early and late bounces disagree. The ball may have hit something or rolled onto another surface. Drop again.');
+      add('spread', F.eSE !== null && F.eSE < CFG.maxSE, `Fitted gaps line up closely (spread ${F.eSE !== null ? F.eSE.toFixed(3) : '-'})`,
+        'Some of the sounds do not line up with a bouncing ball. Keep the room quiet and drop again.');
+      const T1 = F.used[0];
+      e1 = F.used[1] / F.used[0];
+      rebound1 = G * T1 * T1 / 8;
+      dropEst = rebound1 / (e1 * e1);
+      const planH = opts.planHeight > 0 ? opts.planHeight : null;
+      const hOk = planH ? Math.abs(dropEst / planH - 1) <= 0.35 : (dropEst >= CFG.minDrop && dropEst <= CFG.maxDrop);
+      add('height', hOk, `Drop height from the first gap: about ${Math.round(dropEst * 100)} cm${planH ? ` (plan ${Math.round(planH * 100)} cm)` : ''}`,
+        'The timing implies a drop height that does not fit. Something made a sound before the drop, or the first bounce was missed. Keep still after pressing Start.');
+    }
+    const snr = picked.length ? Math.max(...picked.map(c => c.strength)) : 0;
+    let ok = checks.every(c => c.ok) && F.e !== null && F.e > 0.2 && F.e < 0.99 && F.n >= needGaps;
+    // clipping barely moves onset times, so it only blocks a reading when something else also failed
+    if (clipFrac > 0.002) checks.unshift({ id: 'clip', ok, text: ok ? 'Sound clipped, but the timing still lines up' : 'Sound clipped (too loud)', fix: ok ? '' : 'Too loud: put the phone further from the bounce spot (1 to 2 m).' });
+    const t0 = times.length ? times[0] : 0;
+    const rel = times.map(t => t - t0);
+    const T1 = F.used && F.used.length ? F.used[0] : null;
+    const scaled = T1 ? rel.map(t => t / T1) : [];
+    return {
+      ok, e: F.e, eSE: F.eSE, r2: F.r2, eA: F.eA, eB: F.eB, e1,
+      impacts: rel, impactsAbs: times, gaps: F.gaps, used: F.used, nGaps: F.n,
+      scaled, rebound1, dropEst, checks,
+      snrDb: snr, floorDb: floor, peakAbs, clipped: clipFrac > 0.0005,
+      candidates: list.length, sampleRate: sr, duration: samples.length / sr
+    };
+  }
+
+  // ---------- test-bounce synthesis (for the known-bounce check) ----------
+  function impactTimes(e, h, lead) {
+    const out = []; let t = lead, v = Math.sqrt(2 * G * h) * e;
+    out.push({ t, amp: 1 });
+    let amp = 1;
+    for (let i = 0; i < 40; i++) {
+      const T = 2 * v / G;
+      if (T < 0.03) break;
+      t += T; amp *= e; v *= e;
+      out.push({ t, amp });
+    }
+    return out;
+  }
+
+  function synth({ e = 0.75, h = 1.0, sr = 48000, lead = 0.8, tail = 1.0, noise = 0.002, seed = 7, extra = [], maxImpacts = 0, noBall = false } = {}) {
+    let imps = noBall ? [] : impactTimes(e, h, lead);
+    if (maxImpacts) imps = imps.slice(0, maxImpacts);
+    // extra knocks: t is absolute, or {after: n, frac} places it between bounce n and n+1
+    for (const k of extra) {
+      let t = k.t;
+      if (k.after !== undefined && imps[k.after + 1]) t = imps[k.after].t + k.frac * (imps[k.after + 1].t - imps[k.after].t);
+      if (k.before !== undefined && imps[0]) t = imps[0].t - k.before;
+      imps.push({ t, amp: k.A || 1 });
+    }
+    imps.sort((a, b) => a.t - b.t);
+    if (!imps.length) imps.push({ t: lead, amp: 0 });
+    const dur = imps[imps.length - 1].t + tail;
+    const x = new Float32Array(Math.ceil(dur * sr));
+    let s = seed;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+    for (let i = 0; i < x.length; i++) x[i] = noise * rnd();
+    for (const im of imps) {
+      const i0 = Math.round(im.t * sr), A = 0.6 * Math.pow(im.amp, 0.8);
+      const len = Math.round(0.12 * sr);
+      for (let k = 0; k < len && i0 + k < x.length; k++) {
+        const tt = k / sr;
+        const click = rnd() * Math.exp(-tt / 0.0015);
+        const body = Math.sin(2 * Math.PI * 190 * tt) * Math.exp(-tt / 0.03) + 0.5 * Math.sin(2 * Math.PI * 540 * tt) * Math.exp(-tt / 0.012);
+        x[i0 + k] += A * (0.5 * click + 0.6 * body);
+      }
+    }
+    let p = 0; for (const v of x) p = Math.max(p, Math.abs(v));
+    if (p > 0.9) for (let i = 0; i < x.length; i++) x[i] *= 0.9 / p;
+    return { samples: x, sr, impacts: imps.map(i => i.t), e, h };
+  }
+
+  function encodeWAV(samples, sr) {
+    const n = samples.length, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    w(36, 'data'); dv.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) { const v = Math.max(-1, Math.min(1, samples[i])); dv.setInt16(44 + i * 2, v < 0 ? v * 32768 : v * 32767, true); }
+    return buf;
+  }
+
+  // ---------- comparing with labelled references ----------
+  function median(a) { const s = [...a].sort((u, v) => u - v); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+
+  function levels(refs) {
+    // refs: [{label, pressure, e}] -> sorted levels with medians and boundaries
+    const by = new Map();
+    for (const r of refs) {
+      if (!(r.e > 0)) continue;
+      if (!by.has(r.label)) by.set(r.label, { label: r.label, pressure: r.pressure, es: [], items: [] });
+      const L = by.get(r.label); L.es.push(r.e); L.items.push(r);
+    }
+    const L = [...by.values()].map(l => ({ ...l, med: median(l.es), min: Math.min(...l.es), max: Math.max(...l.es) }));
+    L.sort((a, b) => (a.pressure ?? a.med) - (b.pressure ?? b.med) || a.med - b.med);
+    const byMed = [...L].sort((a, b) => a.med - b.med);
+    for (let i = 0; i < byMed.length; i++) {
+      byMed[i].lo = i === 0 ? -Infinity : (byMed[i - 1].med + byMed[i].med) / 2;
+      byMed[i].hi = i === byMed.length - 1 ? Infinity : (byMed[i].med + byMed[i + 1].med) / 2;
+    }
+    return L;
+  }
+
+  function nearest(L, e) {
+    if (!L.length || !(e > 0)) return null;
+    const hit = L.find(l => e >= l.lo && e < l.hi) || null;
+    const all = L.flatMap(l => l.es);
+    const outside = e < Math.min(...all) - 0.03 || e > Math.max(...all) + 0.03;
+    return { level: hit, outside };
+  }
+
+  return { _int: { candidates: (...a) => candidates(...a), envelopeDb, chain }, CFG, G, analyse, highpass, synth, impactTimes, encodeWAV, levels, nearest, median, fit };
+})();
+if (typeof module !== 'undefined') module.exports = BounceCore;
+</script>
+<script>(() => {
+'use strict';
+const VER = '1.1.0';
+const B = BounceCore;
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const last = a => a && a.length ? a[a.length - 1] : 0;
+const fmt = (v, d = 2) => (v === null || v === undefined || !isFinite(v)) ? '-' : (Math.abs(v) < 0.5 * Math.pow(10, -d) ? (0).toFixed(d) : v.toFixed(d));
+const FONT = 'system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif';
+const CFONT = 'Avenir Next Condensed,Roboto Condensed,Arial Narrow,sans-serif-condensed,system-ui,sans-serif';
+
+/* ---------------- storage ---------------- */
+const KEY = 'bb.v1';
+function loadLocal() {
+  try { const v = JSON.parse(localStorage.getItem(KEY)); if (v && Array.isArray(v.recordings)) return v; } catch (e) {}
+  return { protocol: {}, recordings: [] };
+}
+const S = { local: loadLocal(), published: null, loaded: null, demo: null, src: null, last: null, settings: null, testSel: null };
+function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify(S.local)); } catch (e) { toast('Could not save on this phone (storage full or private mode).'); } }
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2600); }
+
+/* ---------------- theme ---------------- */
+const themes = ['auto', 'light', 'dark'];
+function applyTheme(t) {
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  $('#themeBtn').textContent = '◐ ' + t[0].toUpperCase() + t.slice(1); $('#themeBtn').setAttribute('aria-label', 'Theme: ' + t + '. Tap to change.');
+  try { localStorage.setItem('bb.theme', t); } catch (e) {}
+  rerenderCharts();
+}
+$('#themeBtn').addEventListener('click', () => { const cur = (localStorage.getItem('bb.theme') || 'auto'); applyTheme(themes[(themes.indexOf(cur) + 1) % 3]); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => rerenderCharts());
+
+function C() {
+  const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+  return { ink: g('--ink'), ink2: g('--ink-2'), muted: g('--muted'), ref: g('--ref'), line: g('--line'), accent: g('--accent'), accentInk: g('--accent-ink'), surface: g('--surface'), surface2: g('--surface-2'), bg: g('--bg'), good: g('--good'), bad: g('--bad') };
+}
+
+/* ---------------- data sources ---------------- */
+function parsePressure(label) { const m = String(label).match(/-?\d+(\.\d+)?/); if (!m) return null; let v = parseFloat(m[0]); if (/psi/i.test(label)) v *= 0.0689476; if (/kpa/i.test(label)) v /= 100; return v; }
+function toRef(r) { return { id: r.id, label: r.label, pressure: r.pressure ?? parsePressure(r.label), e: r.e, eSE: r.eSE, scaled: r.scaled, used: r.used, nGaps: r.nGaps, session: r.session, setup: r.setup }; }
+function sources() {
+  const out = [];
+  if (S.published && (S.published.references || []).length) out.push({ key: 'published', name: 'Published recordings (from this website)', refs: S.published.references.map(toRef), tests: (S.published.tests || []).map(t => ({ ...t })), protocol: S.published.protocol });
+  if (S.loaded) out.push({ key: 'loaded', name: 'Loaded data file', refs: (S.loaded.references || []).map(toRef), tests: (S.loaded.tests || []).map(t => ({ ...t })), protocol: S.loaded.protocol });
+  const mine = S.local.recordings;
+  if (mine.length) out.push({ key: 'phone', name: 'Drops saved on this phone', refs: mine.filter(r => r.kind === 'reference').map(toRef), tests: mine.filter(r => r.kind === 'test').map(r => ({ id: r.id, e: r.e, eSE: r.eSE, scaled: r.scaled, used: r.used, nGaps: r.nGaps })), protocol: S.local.protocol });
+  if (S.demo) out.push({ key: 'demo', name: 'Example data (simulated)', refs: S.demo.references.map(toRef), tests: S.demo.tests, protocol: S.demo.protocol });
+  return out;
+}
+function currentSource() {
+  const all = sources();
+  if (!all.length) return null;
+  let s = all.find(x => x.key === S.src);
+  if (!s) { s = all[0]; S.src = s.key; }
+  return s;
+}
+function demoOn() { return !!S.demo && S.src === 'demo'; }
+function syncBanners() { $$('[data-demo-banner]').forEach(b => b.classList.toggle('on', demoOn())); }
+
+/* ---------------- charts ---------------- */
+function niceDomain(vals) {
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  lo = Math.floor((lo - 0.03) * 20) / 20; hi = Math.ceil((hi + 0.03) * 20) / 20;
+  if (hi - lo < 0.15) { const m = (hi + lo) / 2; lo = Math.floor((m - 0.075) * 20) / 20; hi = lo + 0.15; }
+  return [Math.max(0, lo), Math.min(1, hi)];
+}
+function svgWrap(inner, w, h, title) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(title)}">${inner}</svg>`;
+}
+
+// Bounce rhythm comparator: one row per reference level, unknown drawn in every row
+function barcodeChart(unk, L, W) {
+  const c = C(), padL = 76, padR = 14, plotW = W - padL - padR;
+  const rows = L.length ? L : [{ label: unk ? 'Your drop' : 'No data', items: [] }];
+  // draw only the impacts used for the score, so barcode length depends on bounciness, not on room noise
+  const fitted = it => (it.scaled || []).slice(0, (it.nGaps || 6) + 1);
+  let xmax = 3;
+  for (const l of rows) for (const it of l.items.slice(0, 6)) xmax = Math.max(xmax, last(fitted(it)));
+  if (unk) xmax = Math.max(xmax, last(fitted(unk)));
+  xmax = Math.min(10, Math.ceil(xmax + 0.2));
+  const X = v => padL + Math.min(v, xmax) / xmax * plotW;
+  let y = 4, g = '';
+  rows.forEach((l, ri) => {
+    const refs = l.items.slice(0, 6), laneH = 7, gap = 3;
+    const refBlock = refs.length * (laneH + gap);
+    const unkH = 16, rowH = Math.max(52, 12 + refBlock + (unk ? unkH + 4 : 0) + 10);
+    if (ri % 2 === 0) g += `<rect x="0" y="${y}" width="${W}" height="${rowH}" rx="10" fill="${c.surface2}" opacity="0.55"/>`;
+    g += `<text x="10" y="${y + 22}" font-family="${CFONT}" font-weight="800" font-size="17" fill="${c.ink}">${esc(l.label)}</text>`;
+    if (L.length) g += `<text x="10" y="${y + 39}" font-family="${FONT}" font-size="11.5" fill="${c.ink2}">${l.items.length} ref${l.items.length === 1 ? '' : 's'}</text>`;
+    refs.forEach((it, i) => {
+      const yy = y + 10 + i * (laneH + gap);
+      for (const t of fitted(it)) if (t <= xmax) g += `<rect x="${(X(t) - 1).toFixed(1)}" y="${yy}" width="2" height="${laneH}" fill="${c.ref}"><title>${esc(l.label)} reference, score ${fmt(it.e)}</title></rect>`;
+    });
+    if (unk) {
+      const yy = y + 12 + refBlock;
+      // faint orange guides through the grey lanes make the match easy to see
+      if (refs.length) for (const t of fitted(unk)) if (t <= xmax) g += `<rect x="${(X(t) - 0.6).toFixed(1)}" y="${y + 8}" width="1.2" height="${refBlock + 2}" fill="${c.accent}" opacity="0.45"/>`;
+      g += `<line x1="${padL}" x2="${W - padR}" y1="${yy + unkH / 2}" y2="${yy + unkH / 2}" stroke="${c.line}" stroke-width="1"/>`;
+      for (const t of fitted(unk)) if (t <= xmax) g += `<rect x="${(X(t) - 1.5).toFixed(1)}" y="${yy}" width="3" height="${unkH}" rx="1.5" fill="${c.accent}"/>`;
+    }
+    y += rowH + 4;
+  });
+  // axis
+  g += `<line x1="${padL}" x2="${W - padR}" y1="${y + 2}" y2="${y + 2}" stroke="${c.line}"/>`;
+  for (let k = 0; k <= xmax; k++) {
+    const xx = X(k);
+    g += `<line x1="${xx}" x2="${xx}" y1="${y + 2}" y2="${y + 7}" stroke="${c.ink2}"/><text x="${xx}" y="${y + 20}" text-anchor="middle" font-family="${FONT}" font-size="11.5" fill="${c.ink2}">${k}</text>`;
+  }
+  g += `<text x="10" y="${y + 37}" font-family="${FONT}" font-size="12" fill="${c.ink2}">Time after the first bounce, in first-gap units</text>`;
+  return { inner: g, w: W, h: y + 44 };
+}
+
+// Bounciness score strip: every drop is a dot on one shared scale, reference ranges labelled
+function stripChart(unkE, L, W, opts = {}) {
+  const c = C(), padL = 76, padR = 18, top = 30, laneH = 30, plotW = W - padL - padR;
+  const vals = L.flatMap(l => l.es); if (unkE > 0) vals.push(unkE);
+  if (!vals.length) return { inner: '', w: W, h: 0 };
+  const [lo, hi] = niceDomain(vals);
+  const X = v => padL + (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * plotW;
+  const lanes = L.length || 1, plotH = lanes * laneH;
+  let g = '';
+  // regions split halfway between neighbouring medians
+  const byMed = [...L].sort((a, b) => a.med - b.med);
+  byMed.forEach((l, i) => {
+    const a = X(Math.max(lo, l.lo)), b = X(Math.min(hi, l.hi));
+    if (i % 2 === 0) g += `<rect x="${a}" y="${top - 4}" width="${Math.max(0, b - a)}" height="${plotH + 8}" fill="${c.surface2}"/>`;
+    if (i > 0) g += `<line x1="${a}" x2="${a}" y1="${top - 8}" y2="${top + plotH + 4}" stroke="${c.ink2}" stroke-dasharray="3 3" stroke-width="1"/>`;
+    const need = String(l.label).length * 6.6 + 6;
+    if (b - a > need) g += `<text x="${(a + b) / 2}" y="${top - 12}" text-anchor="middle" font-family="${FONT}" font-size="11.5" font-weight="600" fill="${c.ink2}">${esc(l.label)}</text>`;
+  });
+  // lanes in pressure order
+  L.forEach((l, i) => {
+    const cy = top + i * laneH + laneH / 2;
+    g += `<text x="10" y="${cy + 5}" font-family="${CFONT}" font-weight="800" font-size="16" fill="${c.ink}">${esc(l.label)}</text>`;
+    g += `<line x1="${X(l.min)}" x2="${X(l.max)}" y1="${cy}" y2="${cy}" stroke="${c.ref}" stroke-width="2" stroke-linecap="round"/>`;
+    const placed = [];
+    [...l.items].sort((a, b) => a.e - b.e).forEach(it => {
+      const x = X(it.e); let off = 0;
+      for (const p of placed) if (Math.abs(p.x - x) < 7 && p.off === off) off = off === 0 ? -6 : (off < 0 ? 6 : 0);
+      placed.push({ x, off });
+      g += `<circle cx="${x.toFixed(1)}" cy="${cy + off}" r="5" fill="${c.ref}" stroke="${c.surface}" stroke-width="2"><title>${esc(l.label)} reference: ${fmt(it.e)}</title></circle>`;
+    });
+  });
+  if (!L.length) g += `<text x="10" y="${top + 20}" font-family="${FONT}" font-size="12" fill="${c.ink2}">No references</text>`;
+  // unknown
+  if (unkE > 0) {
+    const x = X(unkE);
+    g += `<line x1="${x}" x2="${x}" y1="${top - 6}" y2="${top + plotH + 4}" stroke="${c.accent}" stroke-width="3" stroke-linecap="round"/>`;
+    g += `<circle cx="${x}" cy="${top + plotH + 4}" r="6" fill="${c.accent}" stroke="${c.surface}" stroke-width="2"/>`;
+    if (opts.showValue !== false) {
+      const anchor = x > W - 70 ? 'end' : (x < padL + 30 ? 'start' : 'middle');
+      g += `<text x="${x}" y="${top + plotH + 24}" text-anchor="${anchor}" font-family="${CFONT}" font-weight="800" font-size="16" fill="${c.accentInk}">${opts.label || 'This drop'} ${fmt(unkE)}</text>`;
+    }
+  }
+  const ay = top + plotH + (unkE > 0 ? 34 : 10);
+  g += `<line x1="${padL}" x2="${W - padR}" y1="${ay}" y2="${ay}" stroke="${c.line}"/>`;
+  for (let v = Math.round(lo * 20) / 20; v <= hi + 1e-9; v += 0.05) {
+    const xx = X(v);
+    g += `<line x1="${xx}" x2="${xx}" y1="${ay}" y2="${ay + 5}" stroke="${c.ink2}"/><text x="${xx}" y="${ay + 18}" text-anchor="middle" font-family="${FONT}" font-size="11.5" fill="${c.ink2}">${v.toFixed(2)}</text>`;
+  }
+  g += `<text x="10" y="${ay + 35}" font-family="${FONT}" font-size="12" fill="${c.ink2}">Bounciness score (share of speed kept per bounce)</text>`;
+  return { inner: g, w: W, h: ay + 42 };
+}
+
+// Gap staircase: each gap as a share of the first gap, reference bands per level
+function stairChart(unk, L, W) {
+  const c = C(), padL = 46, padR = 70, top = 10, H = 170, plotW = W - padL - padR;
+  // log scale: a ball that keeps the same share each bounce draws a straight line, steeper when softer
+  const K = 6, vmin = 1 / 16, X = n => padL + (n - 1) / (K - 1) * plotW, Y = v => top + Math.log2(1 / Math.max(vmin, v)) / Math.log2(1 / vmin) * H;
+  let g = '';
+  for (const v of [1, 0.5, 0.25, 0.125, 0.0625]) g += `<line x1="${padL}" x2="${padL + plotW}" y1="${Y(v)}" y2="${Y(v)}" stroke="${c.line}"/><text x="${padL - 6}" y="${Y(v) + 4}" text-anchor="end" font-family="${FONT}" font-size="11" fill="${c.ink2}">${v >= 0.25 ? Math.round(v * 100) : (v * 100).toFixed(1).replace('.0', '')}%</text>`;
+  for (let n = 1; n <= K; n++) g += `<text x="${X(n)}" y="${top + H + 18}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${c.ink2}">${n}</text>`;
+  L.forEach(l => {
+    const mins = [], maxs = [];
+    for (let k = 0; k < K; k++) {
+      const v = l.items.filter(it => it.used && it.used.length > k).map(it => it.used[k] / it.used[0]);
+      if (!v.length) break; mins.push(Math.min(...v)); maxs.push(Math.max(...v));
+    }
+    if (!mins.length) return;
+    const pts = maxs.map((v, k) => `${X(k + 1)},${Y(v) - 1.5}`).concat(mins.map((v, k) => `${X(k + 1)},${Y(v) + 1.5}`).reverse()).join(' ');
+    g += `<polygon points="${pts}" fill="${c.ref}" opacity="0.35"/>`;
+    const k = mins.length - 1;
+    g += `<text x="${X(k + 1) + 6}" y="${Y((mins[k] + maxs[k]) / 2) + 4}" font-family="${FONT}" font-size="11.5" font-weight="600" fill="${c.ink2}">${esc(l.label)}</text>`;
+  });
+  if (unk && unk.used && unk.used.length) {
+    const p = unk.used.slice(0, K).map((v, k) => [X(k + 1), Y(v / unk.used[0])]);
+    g += `<polyline points="${p.map(q => q.join(',')).join(' ')}" fill="none" stroke="${c.accent}" stroke-width="2.5"/>`;
+    for (const q of p) g += `<circle cx="${q[0]}" cy="${q[1]}" r="4.5" fill="${c.accent}" stroke="${c.surface}" stroke-width="2"/>`;
+  }
+  g += `<text x="10" y="${top + H + 36}" font-family="${FONT}" font-size="12" fill="${c.ink2}">Gap number (share of the first gap, log scale)</text>`;
+  return { inner: g, w: W, h: top + H + 44 };
+}
+
+function widthOf(el) { return Math.max(300, Math.min(680, (el && el.clientWidth) || 340)); }
+
+function comparatorHTML(unk, src, opts = {}) {
+  if (opts.noStrip) return barcodeOnlyHTML(unk, src, opts);
+  const L = src ? B.levels(src.refs) : [];
+  const id = 'cmp' + Math.random().toString(36).slice(2, 7);
+  const html = `
+    <div class="charthead"><h3>Bounce rhythm</h3></div>
+    <p class="chartnote">Each tick is one bounce. Grey rows are reference balls at known pressure. Orange is ${opts.who || 'your drop'}, repeated in every row. Find the row where they match.</p>
+    <div class="chart" data-chart="barcode" id="${id}a"></div>
+    <div class="charthead" style="margin-top:14px"><h3>Bounciness score</h3></div>
+    <p class="chartnote">Every drop is a dot on one shared scale. The shaded regions are the app's own rule: each group's range, split halfway between neighbouring groups.</p>
+    <div class="chart" data-chart="strip" id="${id}b"></div>
+    ${opts.noSave ? '' : `<div class="btnrow"><button class="btn ghost small" type="button" data-savepic="${id}">Save picture</button></div>`}`;
+  return { html, draw: (root) => {
+    const a = root.querySelector('#' + id + 'a'), b = root.querySelector('#' + id + 'b');
+    const W = widthOf(a);
+    const bc = barcodeChart(unk, L, W), st = stripChart(unk ? unk.e : null, L, W, { label: opts.markLabel || 'This drop' });
+    a.innerHTML = svgWrap(bc.inner, bc.w, bc.h, 'Bounce rhythm comparator');
+    b.innerHTML = st.h ? svgWrap(st.inner, st.w, st.h, 'Bounciness score strip') : '';
+    const btn = root.querySelector(`[data-savepic="${id}"]`);
+    if (btn) btn.onclick = () => savePicture(bc, st, opts.picName || 'bounce_barcode');
+  } };
+}
+
+function barcodeOnlyHTML(unk, src, opts) {
+  const L = src ? B.levels(src.refs) : [];
+  const id = 'cmp' + Math.random().toString(36).slice(2, 7);
+  return { html: `<div class="charthead"><h3>Bounce rhythm</h3></div><p class="chartnote">Each tick is one bounce. Grey rows are reference balls at known pressure. Orange is ${opts.who || 'your drop'}, repeated in every row. Find the row where they match.</p><div class="chart" id="${id}a"></div>`,
+    draw: root => { const a = root.querySelector('#' + id + 'a'); const bc = barcodeChart(unk, L, widthOf(a)); a.innerHTML = svgWrap(bc.inner, bc.w, bc.h, 'Bounce rhythm comparator'); } };
+}
+function savePicture(bc, st, name) {
+  const c = C(), W = bc.w, head = 46, H = head + bc.h + 30 + st.h + 10;
+  const inner = `<rect width="${W}" height="${H}" fill="${c.surface}"/>
+    <text x="10" y="28" font-family="${CFONT}" font-weight="800" font-size="22" fill="${c.ink}">Bounce Barcode: which pressure is this ball closest to?</text>
+    <g transform="translate(0,${head})">${bc.inner}</g>
+    <text x="10" y="${head + bc.h + 22}" font-family="${CFONT}" font-weight="800" font-size="17" fill="${c.ink}">Bounciness score</text>
+    <g transform="translate(0,${head + bc.h + 30})">${st.inner}</g>`;
+  const svg = svgWrap(inner, W, H, 'Bounce Barcode picture');
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+    const x = cv.getContext('2d'); x.scale(2, 2); x.drawImage(img, 0, 0);
+    cv.toBlob(bl => download(bl, name + '.png'), 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+function download(blobOrText, name, type) {
+  const bl = blobOrText instanceof Blob ? blobOrText : new Blob([blobOrText], { type: type || 'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+let redraws = [];
+function rerenderCharts() { for (const f of redraws) try { f(); } catch (e) {} if (S.last) renderHow(S.last.r); }
+
+/* ---------------- microphone ---------------- */
+const AC = window.AudioContext || window.webkitAudioContext;
+function planOpts() { const h = parseFloat((S.local.protocol || {}).height); return h > 0 ? { planHeight: h / 100 } : {}; }
+const WORKLET = `class G extends AudioWorkletProcessor{constructor(){super();this.b=new Float32Array(2048);this.n=0}process(i){const c=i[0]&&i[0][0];if(c){for(let k=0;k<c.length;k++){this.b[this.n++]=c[k];if(this.n===2048){this.port.postMessage(this.b.slice(0));this.n=0}}}return true}}registerProcessor('bb-grab',G);`;
+const M = { ctx: null, stream: null, nodes: [], chunks: [], total: 0, sr: 48000, timer: null, t0: 0, levels: [], impacts: [], live: false };
+
+function micHelp(err) {
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua), inApp = /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|GSA\/|Twitter|LinkedInApp|Snapchat/.test(ua);
+  let why = 'The microphone could not start.';
+  if (!window.isSecureContext) why = 'This page must be opened over https for the microphone to work.';
+  else if (err && err.name === 'NotAllowedError') why = 'Microphone permission was refused.';
+  else if (err && err.name === 'NotFoundError') why = 'No microphone was found.';
+  const steps = [];
+  if (inApp || (err && err.name === 'NotAllowedError')) steps.push('If you opened this link from a chat or mail app, use its menu to open it in Chrome or Safari.');
+  if (ios) steps.push('iPhone: Settings, then Safari (or Chrome), then Microphone, set to Allow or Ask. Then reload this page.');
+  else steps.push('Android: tap the icon left of the web address, then Permissions, then Microphone, Allow. Then reload this page.');
+  steps.push(ios ? 'Or record the drop in Voice Memos, share it to Files, then use Analyse a sound file.' : 'Or record the drop with a voice recorder that saves .m4a or .wav, then use Analyse a sound file.');
+  return `<div class="status bad"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg><div>${esc(why)}<ul class="tight" style="font-weight:400">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div></div>`;
+}
+
+async function startListening() {
+  $('#micErr').innerHTML = '';
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !AC) { $('#micErr').innerHTML = micHelp(null); return; }
+  let ctx;
+  try { ctx = new AC(); ctx.resume(); } catch (e) { $('#micErr').innerHTML = micHelp(e); return; }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+  } catch (e) {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e2) { ctx.close(); $('#micErr').innerHTML = micHelp(e2); return; }
+  }
+  try { await ctx.resume(); } catch (e) {}
+  const tr0 = stream.getAudioTracks()[0];
+  const trRate = tr0 && tr0.getSettings ? tr0.getSettings().sampleRate : null;
+  if (trRate && trRate !== ctx.sampleRate) {
+    // some iPhones change the hardware rate when the mic opens; rebuild the context to match
+    try { ctx.close(); ctx = new AC({ sampleRate: trRate }); await ctx.resume(); } catch (e) { try { ctx = new AC(); await ctx.resume(); } catch (e2) {} }
+  }
+  if (ctx.state !== 'running') {
+    $('#micErr').innerHTML = `<div class="status warn"><div>The phone needs one more tap to start listening.<div class="btnrow"><button class="btn ball" type="button" id="resumeBtn">Tap to begin listening</button></div></div></div>`;
+    await new Promise(res => { $('#resumeBtn').onclick = async () => { try { await ctx.resume(); } catch (e) {} $('#micErr').innerHTML = ''; res(); }; });
+  }
+  Object.assign(M, { ctx, stream, nodes: [], chunks: [], total: 0, sr: ctx.sampleRate, t0: performance.now(), levels: [], impacts: [], live: true, ctx0: null, ctxEnd: null, firstLen: 0, interrupted: false });
+  ctx.onstatechange = () => { if (M.live && (ctx.state === 'interrupted' || ctx.state === 'suspended')) { M.interrupted = true; stopListening(); } };
+  const tr = stream.getAudioTracks()[0];
+  const st = tr && tr.getSettings ? tr.getSettings() : {};
+  S.settings = { echoCancellation: st.echoCancellation, noiseSuppression: st.noiseSuppression, autoGainControl: st.autoGainControl, sampleRate: ctx.sampleRate, device: tr ? tr.label : '', ua: navigator.userAgent };
+  renderDevInfo();
+  const src = ctx.createMediaStreamSource(stream);
+  const sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
+  let ok = false;
+  if (ctx.audioWorklet && window.AudioWorkletNode) {
+    try {
+      const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
+      await ctx.audioWorklet.addModule(url);
+      const node = new AudioWorkletNode(ctx, 'bb-grab');
+      node.port.onmessage = ev => onChunk(ev.data);
+      src.connect(node); node.connect(sink); M.nodes = [src, node, sink]; ok = true;
+    } catch (e) { ok = false; }
+  }
+  if (!ok) {
+    const sp = ctx.createScriptProcessor(4096, 1, 1);
+    sp.onaudioprocess = ev => onChunk(ev.inputBuffer.getChannelData(0).slice(0));
+    src.connect(sp); sp.connect(sink); M.nodes = [src, sp, sink];
+  }
+  $('#idle').hidden = true; $('#result').hidden = true; $('#listen').classList.add('on');
+  $('#liveMsg').textContent = 'Listening. Drop the ball now.';
+  $('#liveCount').textContent = 'Bounces heard: 0';
+  $('#setupBox').open = false;
+  M.timer = setInterval(tick, 500);
+  requestAnimationFrame(drawLive);
+}
+
+function onChunk(f) {
+  if (!M.live) return;
+  if (M.ctx0 === null) { M.ctx0 = M.ctx.currentTime; M.firstLen = f.length; }
+  M.chunks.push(f); M.total += f.length;
+  let p = 0; for (let i = 0; i < f.length; i++) { const v = Math.abs(f[i]); if (v > p) p = v; }
+  const db = 20 * Math.log10(p + 1e-9);
+  M.levels.push({ t: M.total / M.sr, db });
+  const maxKeep = 30 * M.sr;
+  while (M.total > maxKeep && M.chunks.length > 1) { M.total -= M.chunks[0].length; M.chunks.shift(); }
+  $('#meterBar').style.width = Math.max(0, Math.min(100, (db + 70) / 70 * 100)) + '%';
+}
+function joined() { const x = new Float32Array(M.total); let o = 0; for (const c of M.chunks) { x.set(c, o); o += c.length; } return x; }
+
+function tick() {
+  if (!M.live) return;
+  const full = M.total / M.sr, keep = Math.min(M.total, Math.round(12 * M.sr));
+  const x = joined().subarray(M.total - keep), off = full - keep / M.sr, dur = full;
+  const r = B.analyse(x, M.sr);
+  M.impacts = r.impactsAbs.map(t => t + off);
+  const n = M.impacts.length;
+  $('#liveCount').textContent = 'Bounces heard: ' + n;
+  if (n >= 1) $('#liveMsg').textContent = 'Heard it. Keep still until it stops.';
+  const lastT = last(M.impacts), lastGap = n >= 2 ? M.impacts[n - 1] - M.impacts[n - 2] : 1;
+  const quiet = dur - lastT;
+  // stop when the ball has clearly finished; wait patiently if only a stray sound was heard
+  if ((n >= 4 && quiet > Math.max(1.2, 2.5 * lastGap)) || (n >= 2 && n < 4 && quiet > 4) || (n < 2 && dur > 20) || dur > 28) stopListening();
+}
+
+function drawLive() {
+  if (!M.live) return;
+  const cv = $('#liveCanvas'), dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
+  const c = C(), now = M.total / M.sr, span = 6, t0 = Math.max(0, now - span);
+  x.strokeStyle = c.ink2; x.lineWidth = 1.5; x.beginPath();
+  let first = true;
+  for (const l of M.levels) { if (l.t < t0) continue; const px = (l.t - t0) / span * w, py = h - Math.max(0, Math.min(1, (l.db + 70) / 70)) * (h - 14) - 4; if (first) { x.moveTo(px, py); first = false; } else x.lineTo(px, py); }
+  x.stroke();
+  x.fillStyle = c.accent;
+  for (const t of M.impacts) { if (t < t0) continue; const px = (t - t0) / span * w; x.fillRect(px - 1.5, 4, 3, h - 8); }
+  requestAnimationFrame(drawLive);
+}
+
+function stopListening() {
+  if (!M.live) return;
+  M.live = false; clearInterval(M.timer);
+  M.ctxEnd = M.ctx ? M.ctx.currentTime : null;
+  const x = joined();
+  try { M.nodes.forEach(n => n.disconnect()); } catch (e) {}
+  try { M.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+  try { M.ctx.close(); } catch (e) {}
+  $('#listen').classList.remove('on'); $('#idle').hidden = false;
+  const elapsed = M.ctx0 !== null ? (M.ctxEnd - M.ctx0) : null;
+  const got = (M.total - M.firstLen) / M.sr;
+  const r = B.analyse(x, M.sr, planOpts());
+  if (elapsed && elapsed - got > 0.25) {
+    r.ok = false;
+    r.checks.unshift({ id: 'dropout', ok: false, text: `Audio dropped out (${(elapsed - got).toFixed(2)} s missing)`, fix: 'The phone skipped some sound, so gaps cannot be trusted. Close other apps and tabs, then drop again.' });
+  }
+  if (M.interrupted) { r.ok = false; r.checks.unshift({ id: 'interrupted', ok: false, text: 'Listening was interrupted', fix: 'A call, Siri or the screen locking paused the microphone. Drop again.' }); }
+  showResult(r, { source: 'mic', settings: S.settings });
+}
+
+$('#startBtn').addEventListener('click', startListening);
+$('#stopBtn').addEventListener('click', stopListening);
+$('#againBtn').addEventListener('click', () => { $('#result').hidden = true; startListening(); });
+
+$('#fileIn').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  try {
+    const buf = await f.arrayBuffer();
+    const ctx = new AC();
+    const ab = await new Promise((res, rej) => { const p = ctx.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); });
+    const x = ab.getChannelData(0).slice(0);
+    try { ctx.close(); } catch (e) {}
+    const r = B.analyse(x, ab.sampleRate, planOpts());
+    showResult(r, { source: 'file', file: f.name, settings: { sampleRate: ab.sampleRate } });
+  } catch (e) {
+    $('#micErr').innerHTML = `<div class="status bad">This file could not be opened. Try a .wav or .m4a recording, or record again with another app.</div>`;
+  }
+  ev.target.value = '';
+});
+
+/* ---------------- result ---------------- */
+function showResult(r, meta) {
+  S.last = { r, meta, at: new Date().toISOString() };
+  $('#result').hidden = false;
+  const src = currentSource();
+  const L = src ? B.levels(src.refs) : [];
+  let html = '';
+  if (r.ok) {
+    const near = B.nearest(L, r.e);
+    let say;
+    if (!L.length) say = 'No reference balls are loaded, so there is nothing to compare with yet. Record some on the Data tab, or switch on example data on the Test tab.';
+    else if (near.outside) say = r.e < Math.min(...L.flatMap(l => l.es)) ? 'Lower than every reference ball. It may be softer than the lowest level, or dropped on a softer floor.' : 'Higher than every reference ball. It may be harder than the highest level, or dropped on a harder floor.';
+    else if (r.e >= near.level.min && r.e <= near.level.max) say = `Inside the ${near.level.label} group (${fmt(near.level.min)} to ${fmt(near.level.max)} on the reference floor).`;
+    else {
+      const byMed = [...L].sort((a, b) => a.med - b.med), k = byMed.indexOf(near.level);
+      const other = r.e < near.level.min ? byMed[k - 1] : byMed[k + 1];
+      say = other ? `Between the ${[other, near.level].sort((a, b) => a.med - b.med).map(l => l.label).join(' and ')} groups, nearer ${near.level.label}.` : `Just outside the ${near.level.label} group, nearest to it.`;
+    }
+    html += `<div class="score"><div class="num" aria-label="Bounciness score">${fmt(r.e)}</div><div><div class="lab">Bounciness score${r.eSE !== null && r.eSE !== undefined ? (r.eSE < 0.001 ? ' (fit spread under 0.001)' : ' ± ' + fmt(r.eSE, 3) + ' from the fit') : ''}</div><div class="say">${esc(say)}</div></div></div>`;
+    html += `<p class="small">Heard ${r.impacts.length} bounces and used the first ${r.nGaps} gaps. From the first gap, the drop height was about ${Math.round(r.dropEst * 100)} cm. Check that against your tape.</p>`;
+    if (meta.source === 'file') html += `<p class="small">From file: ${esc(meta.file)}</p>`;
+    if (meta.expect) html += selfTestLine(r, meta);
+    if (r.clipped) html += `<div class="status warn">The sound was very loud and clipped. Timing is usually still fine, but move the phone a little further away next time.</div>`;
+    if (L.length && near && near.outside) html += `<div class="status warn">Outside the reference range. Treat this score with care: the references only cover what was measured.</div>`;
+  } else {
+    html += `<div class="status bad"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 8l8 8M16 8l-8 8"/></svg><div>No reading. Drop again.<div style="font-weight:400">The app could not time this drop cleanly, so it shows no score.</div></div></div>`;
+    html += checksHTML(r.checks.filter(c => !c.ok));
+    if (meta.expect) html += selfTestLine(r, meta);
+    if (meta.source === 'mic' || meta.source === 'file') logRefusal(r, meta);
+  }
+  $('#scorePanel').innerHTML = html;
+  const cp = $('#comparePanel');
+  if (r.ok) {
+    cp.hidden = false;
+    const cmp = comparatorHTML({ e: r.e, scaled: r.scaled, used: r.used }, src, { picName: 'bounce_barcode_check' });
+    cp.innerHTML = srcPicker() + cmp.html;
+    const draw = () => cmp.draw(cp);
+    redraws = redraws.filter(f => !f._check); draw._check = true; redraws.push(draw); draw();
+    bindSrcPicker(cp, () => showResult(r, meta));
+  } else { cp.hidden = true; cp.innerHTML = ''; }
+  renderHow(r);
+  renderSave(r, meta);
+  $('#savePanel').hidden = !r.ok;
+  $('#result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function selfTestLine(r, meta) {
+  const pass = meta.expectE ? (r.ok && Math.abs(r.e - meta.expectE) <= 0.01) : (meta.allowEither ? (!r.ok || Math.abs(r.e - 0.75) <= 0.01) : !r.ok);
+  return `<div class="status ${pass ? '' : 'bad'}" style="background:color-mix(in srgb,var(--${pass ? 'good' : 'bad'}) 12%,var(--surface))"><div>Self-test: ${esc(meta.expect)}. ${pass ? 'Result matches.' : 'Result does not match. Please report this.'}</div></div>`;
+}
+function logRefusal(r, meta) {
+  const L = S.local.refusals || (S.local.refusals = []);
+  L.push({ at: new Date().toISOString(), source: meta.source, reasons: r.checks.filter(c => !c.ok).map(c => c.id).join(';'), heard: r.impacts.length, app: VER });
+  if (L.length > 500) L.shift();
+  saveLocal();
+}
+function checksHTML(list) {
+  return `<ul class="checks">${list.map(c => `<li><span class="${c.ok ? 'tick' : 'cross'}" aria-label="${c.ok ? 'passed' : 'failed'}">${c.ok ? '✓' : '✕'}</span><span>${esc(c.text)}${c.fix ? `<span class="fix">${esc(c.fix)}</span>` : ''}</span></li>`).join('')}</ul>`;
+}
+
+function srcPicker() {
+  const all = sources();
+  if (all.length < 2) return all.length ? `<p class="small">Compared with: ${esc(all[0].name)}, ${all[0].refs.length} reference drops.</p>` : '';
+  return `<label class="f">Compare with</label><select data-srcpick>${all.map(s => `<option value="${s.key}" ${s.key === S.src ? 'selected' : ''}>${esc(s.name)} (${s.refs.length} refs)</option>`).join('')}</select>`;
+}
+function bindSrcPicker(root, after) { const s = root.querySelector('[data-srcpick]'); if (s) s.onchange = () => { S.src = s.value; syncBanners(); after(); }; }
+
+function renderHow(r) {
+  const body = $('#howBody'); if (!body) return;
+  const src = currentSource(), L = src ? B.levels(src.refs) : [];
+  let h = '';
+  if (r.used && r.used.length >= 2) {
+    h += `<h3 style="margin-top:8px">How fast the gaps shrink</h3><p class="chartnote">On this log scale each drop is close to a straight line. A steeper line means a softer ball.</p><div class="chart" id="stairBox"></div>`;
+    h += `<div class="tablewrap"><table class="rec"><thead><tr><th>Gap</th><th>Length (ms)</th><th>Share of previous</th></tr></thead><tbody>${r.used.map((g, i) => `<tr><td>${i + 1}</td><td>${(g * 1000).toFixed(1)}</td><td>${i ? fmt(g / r.used[i - 1], 3) : '-'}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  h += `<h3 style="margin-top:14px">Checks</h3>${checksHTML(r.checks)}`;
+  if (r.ok) h += `<p class="small">Score from a straight-line fit of log(gap) against gap number, using up to six gaps. Fit quality ${fmt(r.r2, 4)}. Early bounces ${fmt(r.eA)}, late bounces ${fmt(r.eB)}. First rebound height ${r.rebound1 ? Math.round(r.rebound1 * 100) + ' cm' : '-'} (from g × gap² / 8). Loudest bounce ${Math.round(r.snrDb)} dB above the background. Sample rate ${r.sampleRate} Hz.</p>`;
+  body.innerHTML = h;
+  const sb = $('#stairBox');
+  if (sb) { const W = widthOf(sb); const s = stairChart({ used: r.used }, L, W); sb.innerHTML = svgWrap(s.inner, s.w, s.h, 'Gap staircase'); }
+}
+
+function protocolLevels() {
+  const p = S.local.protocol || {};
+  return String(p.levels || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function newTestId() {
+  const al = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const used = new Set(S.local.recordings.map(r => r.id));
+  let id; do { id = 'T' + Array.from({ length: 3 }, () => al[Math.floor(Math.random() * al.length)]).join(''); } while (used.has(id));
+  return id;
+}
+function renderSave(r, meta) {
+  const lv = protocolLevels(), p = S.local.protocol || {};
+  const lastRec = S.local.recordings[S.local.recordings.length - 1] || {};
+  if (!lv.length) { $('#saveBody').innerHTML = `<p class="note">First set your pressure levels on the <a href="#data">Data tab</a>, so every drop is saved against a level fixed in advance.</p>`; return; }
+  $('#saveBody').innerHTML = `
+    <label class="f">Use this drop as</label>
+    <div class="seg" id="svKind"><button type="button" data-v="reference" aria-pressed="true">Reference</button><button type="button" data-v="test">Held-out test</button></div>
+    <div class="grid2">
+      <div><label class="f" for="svLevel">Pressure level</label><select id="svLevel">${lv.map(l => `<option ${l === lastRec.label ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+      <div><label class="f" for="svGauge">Gauge reading now</label><input id="svGauge" type="number" step="0.01" inputmode="decimal" placeholder="0.30"></div>
+      <div><label class="f" for="svUnit">Unit</label><select id="svUnit"><option>bar</option><option>psi</option><option>kPa</option></select></div>
+      <div><label class="f" for="svSetup">Setup number (new after re-pumping)</label><input id="svSetup" type="number" inputmode="numeric" value="${(lastRec.setup || 0) + 0}"></div>
+      <div><label class="f" for="svSession">Session</label><input id="svSession" type="text" value="${esc(lastRec.session || 'S1')}"></div>
+      <div><label class="f" for="svNote">Note</label><input id="svNote" type="text" placeholder="optional"></div>
+    </div>
+    <div class="btnrow"><button class="btn primary" id="svBtn" type="button">Save drop</button></div>
+    <p class="small">Same setup = another drop without changing the air. New setup = let air out, pump back to the level, read the gauge.</p>`;
+  let kind = 'reference';
+  $$('#svKind button').forEach(b => b.onclick = () => { kind = b.dataset.v; $$('#svKind button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  $('#svBtn').onclick = () => {
+    const label = $('#svLevel').value, gauge = parseFloat($('#svGauge').value);
+    if (!isFinite(gauge)) { toast('Type the gauge reading first. It is the label.'); return; }
+    const rec = {
+      id: kind === 'test' ? newTestId() : 'R' + (S.local.recordings.filter(x => x.kind === 'reference').length + 1).toString().padStart(3, '0'),
+      kind, label, pressure: parsePressure(label), gauge, gaugeUnit: $('#svUnit').value,
+      setup: parseInt($('#svSetup').value || '0', 10), session: $('#svSession').value.trim(), note: $('#svNote').value.trim(),
+      ball: p.ball || '', floor: p.floor || '', dropHeightCm: p.height || '', createdAt: S.last.at, source: meta.source, file: meta.file || '',
+      e: r.e, eSE: r.eSE, r2: r.r2, eA: r.eA, eB: r.eB, nGaps: r.nGaps, impacts: r.impacts, used: r.used, scaled: r.scaled,
+      rebound1Cm: r.rebound1 * 100, dropEstCm: r.dropEst * 100, snrDb: r.snrDb, clipped: r.clipped,
+      sampleRate: r.sampleRate, settings: meta.settings || {}, app: VER
+    };
+    S.local.recordings.push(rec); saveLocal();
+    if (!S.src || S.src === 'demo') S.src = 'phone';
+    toast(`Saved ${rec.id}: ${kind === 'test' ? 'held-out test' : 'reference'}, ${label}, setup ${rec.setup}`);
+    $('#savePanel').open = false;
+  };
+}
+
+/* ---------------- compare tab ---------------- */
+function renderCompare() {
+  const all = sources(), sel = $('#srcSel');
+  sel.innerHTML = all.length ? all.map(s => `<option value="${s.key}" ${s.key === S.src ? 'selected' : ''}>${esc(s.name)}</option>`).join('') : '<option>No recordings yet</option>';
+  const src = currentSource();
+  syncBanners();
+  if (!src) {
+    $('#srcNote').innerHTML = 'Nothing to show yet. Save reference and test drops from Check a ball, load a data file on the Data tab, or switch on example data on the Test tab.';
+    $('#testChips').innerHTML = ''; $('#testPanel').innerHTML = '<p class="note">No test recordings.</p>'; return;
+  }
+  $('#srcNote').textContent = `${src.refs.length} reference drops, ${src.tests.length} test recordings.`;
+  const tests = [...src.tests].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  $('#testChips').innerHTML = tests.map(t => `<button class="chip" type="button" data-t="${esc(t.id)}" aria-pressed="${t.id === S.testSel}">${esc(t.id)}</button>`).join('');
+  $$('#testChips .chip').forEach(b => b.onclick = () => { S.testSel = b.dataset.t; renderCompare(); });
+  const t = tests.find(x => x.id === S.testSel);
+  const tp = $('#testPanel');
+  if (!t) { tp.innerHTML = `<p class="note">${tests.length ? 'Pick a test recording above.' : 'This set has no test recordings.'}</p>`; return; }
+  const cmp = comparatorHTML(t, src, { who: 'test recording ' + t.id, markLabel: t.id, picName: 'bounce_barcode_' + t.id });
+  tp.innerHTML = `<h3>Recording ${esc(t.id)}</h3>` + cmp.html;
+  const draw = () => cmp.draw(tp); redraws = redraws.filter(f => !f._cmp); draw._cmp = true; redraws.push(draw); draw();
+}
+$('#srcSel').addEventListener('change', e => { S.src = e.target.value; S.testSel = null; renderCompare(); });
+
+/* ---------------- reader test ---------------- */
+const RT = { items: [], i: 0, answers: [], levels: [], exposure: 0, t: 0, code: '', timer: null };
+$('#rtStart').addEventListener('click', () => {
+  const src = currentSource();
+  if (!src || !src.tests.length || !src.refs.length) { toast('Needs reference drops and test recordings first.'); return; }
+  RT.src = src; RT.levels = B.levels(src.refs).map(l => l.label);
+  RT.items = [...src.tests].sort(() => Math.random() - 0.5);
+  RT.i = 0; RT.answers = []; RT.code = Math.random().toString(36).slice(2, 6).toUpperCase();
+  $('#rt').classList.add('on'); document.body.style.overflow = 'hidden';
+  rtIntro();
+});
+function rtClose() { $('#rt').classList.remove('on'); document.body.style.overflow = ''; clearTimeout(RT.timer); }
+function rtIntro() {
+  $('#rtBody').innerHTML = `
+    <h2 id="rtTitle">Reader test</h2>
+    <p class="lede">A ball was dropped and the phone heard its bounces. Your job: say which pump pressure it was at.</p>
+    <div class="panel">
+      <h3>How to read it (30 seconds)</h3>
+      <ul class="tight">
+        <li>Each tick is one bounce. Grey rows are reference balls at known pressures.</li>
+        <li>The orange barcode is the mystery drop, repeated in every row. Pick the row where the orange ticks line up with the grey ones.</li>
+        <li>Soft ball: short, bunched barcode and a low score. Well pumped ball: long barcode and a high score.</li>
+        <li>If shown, the score scale below places the drop among the reference groups.</li>
+      </ul>
+    </div>
+    <label class="f">How long to show each picture</label>
+    <div class="seg" id="rtExp"><button type="button" data-v="0" aria-pressed="true">No limit</button><button type="button" data-v="10">10 seconds</button></div>
+    <label class="f">Picture</label>
+    <div class="seg" id="rtLay"><button type="button" data-v="full" aria-pressed="true">Barcode and score</button><button type="button" data-v="barcode">Barcode only</button></div>
+    <p class="small">${RT.items.length} recordings. Reader code ${RT.code}.</p>
+    <div class="btnrow"><button class="btn ball" id="rtGo" type="button">Begin</button><button class="btn ghost" id="rtX" type="button">Cancel</button></div>`;
+  $$('#rtExp button').forEach(b => b.onclick = () => { RT.exposure = +b.dataset.v; $$('#rtExp button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  RT.layout = 'full';
+  $$('#rtLay button').forEach(b => b.onclick = () => { RT.layout = b.dataset.v; $$('#rtLay button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  $('#rtGo').onclick = rtItem; $('#rtX').onclick = rtClose;
+}
+function rtItem() {
+  const t = RT.items[RT.i]; let choice = null, conf = null;
+  const cmp = comparatorHTML(t, RT.src, { who: 'the mystery drop', markLabel: 'Mystery drop', noSave: true, noStrip: RT.layout === 'barcode' });
+  $('#rtBody').innerHTML = `
+    <p class="small">Recording ${RT.i + 1} of ${RT.items.length}</p>
+    <h2 id="rtTitle" style="font-size:24px">Which pressure was this ball at?</h2>
+    <div class="cover" id="rtCover"><div class="panel" style="margin-top:8px">${cmp.html}</div><div class="coverlay">Time is up. Choose your answer below.</div></div>
+    <div class="answers" role="group" aria-label="Answer">${RT.levels.map(l => `<button class="btn ghost" type="button" data-a="${esc(l)}">${esc(l)}</button>`).join('')}</div>
+    <div class="conf">How sure? <div class="seg" id="rtConf"><button type="button" data-v="1">Guess</button><button type="button" data-v="2">Fairly</button><button type="button" data-v="3">Very</button></div></div>
+    <div class="btnrow"><button class="btn primary" id="rtNext" type="button" disabled>${RT.i + 1 === RT.items.length ? 'Finish' : 'Next'}</button></div>`;
+  cmp.draw($('#rtBody'));
+  RT.t = performance.now();
+  clearTimeout(RT.timer);
+  if (RT.exposure) RT.timer = setTimeout(() => $('#rtCover').classList.add('hidden'), RT.exposure * 1000);
+  let ms = null;
+  $$('#rtBody .answers .btn').forEach(b => b.onclick = () => { choice = b.dataset.a; ms = Math.round(performance.now() - RT.t); $$('#rtBody .answers .btn').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#rtNext').disabled = false; });
+  $$('#rtConf button').forEach(b => b.onclick = () => { conf = +b.dataset.v; $$('#rtConf button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  $('#rtNext').onclick = () => {
+    RT.answers.push({ recording: t.id, answer: choice, confidence: conf, ms });
+    RT.i++; if (RT.i < RT.items.length) { window.scrollTo(0, 0); $('#rt').scrollTo(0, 0); rtItem(); } else rtDone();
+  };
+}
+function rtDone() {
+  clearTimeout(RT.timer);
+  const rows = ['reader_code,order,recording_id,answer,confidence,ms_to_answer,exposure_s,picture,data_set,app_version'];
+  RT.answers.forEach((a, i) => rows.push([RT.code, i + 1, a.recording, '"' + a.answer + '"', a.confidence ?? '', a.ms, RT.exposure || 'none', RT.layout, RT.src.key, VER].join(',')));
+  const text = rows.join('\n');
+  $('#rtBody').innerHTML = `<h2 id="rtTitle">Done, thank you</h2><p class="lede">Copy your answers and send them to the person running the test.</p>
+    <div class="btnrow"><button class="btn ball" id="rtCopy" type="button">Copy my answers</button><button class="btn ghost" id="rtX" type="button">Close</button></div>
+    <textarea rows="8" readonly id="rtText">${esc(text)}</textarea>`;
+  $('#rtCopy').onclick = async () => { try { await navigator.clipboard.writeText(text); toast('Answers copied'); } catch (e) { $('#rtText').select(); document.execCommand('copy'); toast('Answers copied'); } };
+  $('#rtX').onclick = rtClose;
+}
+
+/* ---------------- test tab ---------------- */
+function segVal(id) { const b = document.querySelector(`#${id} [aria-pressed="true"]`); return b ? parseFloat(b.dataset.v) : null; }
+['kbE', 'kbH'].forEach(id => $$(`#${id} button`).forEach(b => b.onclick = () => $$(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b))));
+$('#kbPlay').addEventListener('click', async () => {
+  try {
+    const ctx = new AC(); await ctx.resume();
+    const s = B.synth({ e: segVal('kbE'), h: segVal('kbH'), sr: ctx.sampleRate, lead: 0.4, tail: 0.5 });
+    const buf = ctx.createBuffer(1, s.samples.length, ctx.sampleRate); buf.copyToChannel ? buf.copyToChannel(s.samples, 0) : buf.getChannelData(0).set(s.samples);
+    const node = ctx.createBufferSource(); node.buffer = buf; node.connect(ctx.destination); node.start();
+    node.onended = () => ctx.close();
+    toast(`Playing a test bounce with score ${segVal('kbE').toFixed(2)}. Turn the volume up.`);
+  } catch (e) { toast('This browser could not play sound.'); }
+});
+$('#kbSave').addEventListener('click', () => {
+  const e = segVal('kbE'), h = segVal('kbH');
+  const s = B.synth({ e, h, sr: 48000, lead: 1.0, tail: 1.0 });
+  download(new Blob([B.encodeWAV(s.samples, 48000)], { type: 'audio/wav' }), `test_bounce_score_${e.toFixed(2)}_${Math.round(h * 100)}cm.wav`);
+});
+const SELF = {
+  good: { o: { e: 0.75 }, expect: 'a clean drop with score 0.75 should read 0.75', expectE: 0.75 },
+  pre: { o: { e: 0.75, lead: 1.6, extra: [{ before: 0.9, A: 1.2 }] }, expect: 'a knock before the drop should be ignored, reading 0.75', expectE: 0.75 },
+  mid: { o: { e: 0.75, extra: [{ after: 3, frac: 0.45, A: 0.7 }] }, expect: 'a knock between bounces should give 0.75 or No reading, never a wrong score', allowEither: true },
+  three: { o: { e: 0.75, maxImpacts: 3 }, expect: 'only three bounces should give No reading' },
+  noball: { o: { noBall: true, lead: 0.5, extra: [{ t: 0.6, A: 0.8 }, { t: 1.3, A: 0.6 }, { t: 1.75, A: 0.9 }, { t: 2.6, A: 0.5 }, { t: 2.9, A: 0.7 }, { t: 3.8, A: 0.6 }] }, expect: 'random knocks with no ball should give No reading' }
+};
+$$('[data-self]').forEach(b => b.addEventListener('click', () => {
+  const t = SELF[b.dataset.self], s = B.synth({ sr: 48000, ...t.o });
+  location.hash = '#check';
+  setTimeout(() => showResult(B.analyse(s.samples, s.sr), { source: 'self-test', expect: t.expect, expectE: t.expectE, allowEither: t.allowEither }), 60);
+}));
+function renderDevInfo() {
+  const s = S.settings; if (!s) return;
+  const on = v => v === undefined ? 'not reported' : (v ? 'on' : 'off');
+  $('#devInfo').innerHTML = `<ul class="tight"><li>Sample rate: ${s.sampleRate} Hz</li><li>Echo cancellation: ${on(s.echoCancellation)}</li><li>Noise suppression: ${on(s.noiseSuppression)}</li><li>Auto gain: ${on(s.autoGainControl)}</li><li>Browser: ${esc(s.ua)}</li></ul><p>The score uses only the timing of bounces, so it should survive any of these being on. If all three are on and readings jump around, say so in your report.</p>`;
+}
+
+function shuffle(a) { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
+function wilson(k, n, z = 1.96) { if (!n) return [0, 0]; const p = k / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d, h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d; return [Math.max(0, c - h), Math.min(1, c + h)]; }
+function makeDemo() {
+  const rnd = (() => { let s = 12345; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+  const lv = [['0.1 bar', 0.62], ['0.3 bar', 0.76], ['0.6 bar', 0.83]];
+  const references = [], tests = [];
+  const al = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  for (const [label, em] of lv) {
+    for (let k = 0; k < 10; k++) {
+      const e = em + 0.012 * gauss(), h = 1.0 + 0.03 * gauss();
+      const s = B.synth({ e, h, sr: 16000, noise: 0.004, seed: 1 + Math.floor(rnd() * 1e6) });
+      const r = B.analyse(s.samples, s.sr);
+      if (!r.ok) continue;
+      const base = { e: r.e, eSE: r.eSE, scaled: r.scaled, used: r.used, nGaps: r.nGaps, synthetic: true };
+      if (k < 6) references.push({ ...base, id: 'DR' + references.length, label, pressure: parsePressure(label) });
+      else tests.push({ ...base, id: 'X' + Array.from({ length: 3 }, () => al[Math.floor(rnd() * al.length)]).join('') });
+    }
+  }
+  return { protocol: { levels: lv.map(l => l[0]).join(', '), ball: 'simulated', floor: 'simulated' }, references, tests: shuffle(tests) };
+}
+$('#demoBtn').addEventListener('click', () => {
+  if (S.demo) { S.demo = null; if (S.src === 'demo') S.src = null; toast('Example data switched off'); }
+  else { S.demo = makeDemo(); S.src = 'demo'; toast('Example data on. It is simulated.'); }
+  $('#demoBtn').textContent = S.demo ? 'Switch off example data' : 'Switch on example data';
+  syncBanners(); renderCompare();
+});
+
+/* ---------------- data tab ---------------- */
+function renderData() {
+  const p = S.local.protocol || {}, locked = !!p.lockedAt;
+  $('#pLevels').value = p.levels || ''; $('#pBall').value = p.ball || ''; $('#pFloor').value = p.floor || ''; $('#pHeight').value = p.height || ''; $('#pGauge').value = p.gauge || '';
+  ['pLevels', 'pBall', 'pFloor', 'pHeight', 'pGauge'].forEach(id => $('#' + id).disabled = locked);
+  $('#pLock').textContent = locked ? 'Unlock plan' : 'Lock plan';
+  $('#pStatus').textContent = locked ? `Locked on ${new Date(p.lockedAt).toLocaleString()}. Unlocking is recorded.` : (p.unlockedAt ? `Unlocked on ${new Date(p.unlockedAt).toLocaleString()}.` : 'Not locked yet.');
+  const recs = S.local.recordings, lv = protocolLevels();
+  const cnt = (kind, l) => { const rs = recs.filter(r => r.kind === kind && r.label === l); return `${new Set(rs.map(r => r.session + '/' + r.setup)).size} setups, ${rs.length} drops`; };
+  $('#countsPanel').innerHTML = lv.length ? `<h3>Progress</h3><div class="tablewrap"><table class="rec"><thead><tr><th>Level</th><th>References</th><th>Held-out tests</th></tr></thead><tbody>${lv.map(l => `<tr><td>${esc(l)}</td><td>${cnt('reference', l)}</td><td>${cnt('test', l)}</td></tr>`).join('')}</tbody></table></div>` : '<h3>Progress</h3><p class="note">Set your pressure levels above to start.</p>';
+  $('#countsPanel').innerHTML += accuracyHTML();
+  $('#recTable').innerHTML = recs.length ? `<table class="rec"><thead><tr><th>ID</th><th>Use</th><th>Level</th><th>Gauge</th><th>Score</th><th>Setup</th><th></th></tr></thead><tbody>${[...recs].reverse().map(r => `<tr><td>${esc(r.id)}</td><td>${r.kind === 'test' ? 'test' : 'ref'}</td><td>${esc(r.label)}</td><td>${r.gauge} ${esc(r.gaugeUnit)}</td><td>${fmt(r.e)}</td><td>${esc(r.session)}/${r.setup}</td><td><button class="chip" type="button" data-del="${esc(r.id)}" aria-label="Delete ${esc(r.id)}">Delete</button></td></tr>`).join('')}</tbody></table>` : '<p class="note">No drops saved yet. Drop a ball on the Check tab, then open Save this drop.</p>';
+  $$('[data-del]').forEach(b => b.onclick = () => { if (!confirmLite(b, 'Tap again to delete')) return; S.local.recordings = S.local.recordings.filter(r => r.id !== b.dataset.del); saveLocal(); renderData(); });
+}
+function accuracyHTML() {
+  const recs = S.local.recordings, refs = recs.filter(r => r.kind === 'reference'), tests = recs.filter(r => r.kind === 'test');
+  const nRef = (S.local.refusals || []).length;
+  let h = `<p class="small">Failed drops logged on this phone (No reading): ${nRef}. They are kept in the CSV as failure cases.</p>`;
+  if (!refs.length || !tests.length) return h;
+  const L = B.levels(refs.map(toRef)), labels = L.map(l => l.label), cols = labels.concat(['Outside range']);
+  const M = {}; labels.forEach(a => { M[a] = {}; cols.forEach(b => M[a][b] = 0); });
+  let k = 0;
+  for (const t of tests) {
+    const nr = B.nearest(L, t.e); const pred = !nr || !nr.level ? 'Outside range' : (nr.outside ? 'Outside range' : nr.level.label);
+    if (!M[t.label]) { M[t.label] = {}; cols.forEach(b => M[t.label][b] = 0); }
+    M[t.label][pred]++; if (pred === t.label) k++;
+  }
+  const [lo, hi] = wilson(k, tests.length);
+  h += `<h3 style="margin-top:12px">App rule on held-out tests</h3><p><b>${k} of ${tests.length}</b> correct (Wilson 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%). Rule: nearest reference group, boundaries halfway between group medians, set from references only.</p>`;
+  h += `<div class="tablewrap"><table class="rec"><thead><tr><th>True level</th>${cols.map(c => `<th>App says ${esc(c)}</th>`).join('')}</tr></thead><tbody>${Object.keys(M).map(a => `<tr><td>${esc(a)}</td>${cols.map(c => `<td>${M[a][c]}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return h;
+}
+function confirmLite(btn, msg) { if (btn.dataset.armed) return true; btn.dataset.armed = '1'; const t = btn.textContent; btn.textContent = msg; setTimeout(() => { delete btn.dataset.armed; btn.textContent = t; }, 2500); return false; }
+$('#pLock').addEventListener('click', () => {
+  const p = S.local.protocol || (S.local.protocol = {});
+  if (p.lockedAt) { p.unlockedAt = new Date().toISOString(); p.lockHistory = (p.lockHistory || []).concat([{ unlocked: p.unlockedAt }]); delete p.lockedAt; }
+  else {
+    Object.assign(p, { levels: $('#pLevels').value.trim(), ball: $('#pBall').value.trim(), floor: $('#pFloor').value.trim(), height: $('#pHeight').value.trim(), gauge: $('#pGauge').value.trim() });
+    if (!protocolLevels().length) { toast('Type at least two pressure levels first.'); return; }
+    p.lockedAt = new Date().toISOString(); p.lockHistory = (p.lockHistory || []).concat([{ locked: p.lockedAt }]);
+  }
+  saveLocal(); renderData();
+});
+['pLevels', 'pBall', 'pFloor', 'pHeight', 'pGauge'].forEach(id => $('#' + id).addEventListener('change', () => {
+  const p = S.local.protocol || (S.local.protocol = {}); if (p.lockedAt) return;
+  p[{ pLevels: 'levels', pBall: 'ball', pFloor: 'floor', pHeight: 'height', pGauge: 'gauge' }[id]] = $('#' + id).value.trim(); saveLocal();
+}));
+const CSVCOLS = ['id', 'kind', 'label', 'pressure_bar_nominal', 'gauge', 'gauge_unit', 'session', 'setup', 'created_at', 'ball', 'floor', 'drop_height_cm', 'score_e', 'score_se', 'fit_r2', 'e_early', 'e_late', 'n_gaps_used', 'impact_times_s', 'gaps_used_s', 'rebound1_cm', 'drop_est_cm', 'loudest_db_above_floor', 'clipped', 'source', 'file', 'sample_rate', 'echo_cancellation', 'noise_suppression', 'auto_gain', 'user_agent', 'note', 'app_version'];
+function csvCell(v) { if (v === null || v === undefined) return ''; const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+$('#exCsv').addEventListener('click', () => {
+  const rows = [CSVCOLS.join(',')];
+  for (const r of S.local.recordings) rows.push([r.id, r.kind, r.label, r.pressure, r.gauge, r.gaugeUnit, r.session, r.setup, r.createdAt, r.ball, r.floor, r.dropHeightCm, r.e?.toFixed(5), r.eSE?.toFixed(5), r.r2?.toFixed(5), r.eA?.toFixed(4), r.eB?.toFixed(4), r.nGaps, (r.impacts || []).map(v => v.toFixed(5)).join(';'), (r.used || []).map(v => v.toFixed(5)).join(';'), r.rebound1Cm?.toFixed(1), r.dropEstCm?.toFixed(1), r.snrDb?.toFixed(1), r.clipped, r.source, r.file, r.sampleRate, r.settings?.echoCancellation, r.settings?.noiseSuppression, r.settings?.autoGainControl, r.settings?.ua, r.note, r.app].map(csvCell).join(','));
+  for (const f of (S.local.refusals || [])) rows.push(CSVCOLS.map(c => c === 'kind' ? 'refused' : c === 'created_at' ? f.at : c === 'source' ? f.source : c === 'note' ? 'failed checks: ' + f.reasons + '; impacts heard: ' + f.heard : c === 'app_version' ? f.app : '').map(csvCell).join(','));
+  download(rows.join('\n'), 'c5_bounce_measurements.csv', 'text/csv');
+});
+$('#exSite').addEventListener('click', () => {
+  const recs = S.local.recordings;
+  const strip = r => ({ id: r.id, e: r.e, eSE: r.eSE, r2: r.r2, nGaps: r.nGaps, impacts: r.impacts, used: r.used, scaled: r.scaled, dropEstCm: r.dropEstCm, sampleRate: r.sampleRate });
+  const out = { app: 'Bounce Barcode', version: VER, exported: new Date().toISOString(), protocol: S.local.protocol,
+    references: recs.filter(r => r.kind === 'reference').map(r => ({ ...strip(r), label: r.label, pressure: r.pressure, gauge: r.gauge, gaugeUnit: r.gaugeUnit, session: r.session, setup: r.setup })),
+    tests: shuffle(recs.filter(r => r.kind === 'test').map(strip)) };
+  download(JSON.stringify(out, null, 1), 'bounce_data.json', 'application/json');
+});
+$('#exTruth').addEventListener('click', () => {
+  const rows = ['recording_id,true_condition,gauge_reading,gauge_unit,session,setup,label_method'];
+  for (const r of S.local.recordings.filter(x => x.kind === 'test')) rows.push([r.id, r.label, r.gauge, r.gaugeUnit, r.session, r.setup, 'pressure gauge read just before the drop, filmed'].map(csvCell).join(','));
+  download(rows.join('\n'), 'c5_test_truth.csv', 'text/csv');
+});
+$('#imJson').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (Array.isArray(j.recordings)) { const have = new Set(S.local.recordings.map(r => r.id)); j.recordings.forEach(r => { if (!have.has(r.id)) S.local.recordings.push(r); }); saveLocal(); toast('Backup merged'); }
+    else if (Array.isArray(j.references)) { S.loaded = j; S.src = 'loaded'; toast(`Loaded ${j.references.length} references and ${(j.tests || []).length} tests`); }
+    else throw new Error('format');
+    renderData();
+  } catch (e) { toast('That file is not a Bounce Barcode data file.'); }
+  ev.target.value = '';
+});
+$('#clearAll').addEventListener('click', ev => { if (!confirmLite(ev.target, 'Tap again to delete everything')) return; S.local.recordings = []; S.local.refusals = []; saveLocal(); renderData(); toast('All drops deleted from this phone'); });
+
+/* ---------------- hero animation ---------------- */
+function hero() {
+  const svg = $('#heroSvg'); if (!svg) return;
+  const floorY = 150, R = 13, x0 = 34, x1 = 330, Hpx = 118;
+  let planks = ''; for (let x = 0; x <= 360; x += 46) planks += `<line x1="${x}" x2="${x}" y1="${floorY}" y2="${floorY + 18}" stroke="var(--wood-2)" stroke-width="1"/>`;
+  svg.innerHTML = `
+    <defs><clipPath id="hc"><rect x="0" y="0" width="360" height="210"/></clipPath></defs>
+    <g clip-path="url(#hc)">
+      <line x1="${x0 - 14}" x2="${x0 + 14}" y1="${floorY - Hpx - R * 2 - 4}" y2="${floorY - Hpx - R * 2 - 4}" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="4 3"/>
+      <text x="${x0 + 20}" y="${floorY - Hpx - R * 2}" font-family="${FONT}" font-size="11" fill="var(--ink-2)">your mark</text>
+      <path id="hTrail" d="" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="1 5" stroke-linecap="round" opacity=".75"/>
+      <rect x="0" y="${floorY}" width="360" height="18" fill="var(--wood)"/>${planks}
+      <rect x="236" y="${floorY + 7}" width="124" height="3" fill="var(--courtline)" opacity=".55"/>
+      <rect x="0" y="${floorY + 22}" width="360" height="32" rx="8" fill="var(--surface-2)"/>
+      <g id="hBars"></g>
+      <g id="hBall"><ellipse id="hShadow" cx="0" cy="${floorY + 1}" rx="12" ry="2.5" fill="var(--ink)" opacity=".15"/>
+        <g id="hBody"><circle r="${R}" fill="var(--accent)"/><path d="M0 -${R}V${R}M-${R} 0H${R}M-8 -10c5 5 5 15 0 20M8 -10c-5 5 -5 15 0 20" stroke="var(--ink)" stroke-width="1.3" fill="none"/></g></g>
+    </g>`;
+  const e = 0.78, g = 9.81, h = 1.0;
+  // physics timeline
+  const tFall = Math.sqrt(2 * h / g), imps = [tFall]; let v = Math.sqrt(2 * g * h) * e, t = tFall;
+  while (true) { const T = 2 * v / g; if (T < 0.04) break; t += T; imps.push(t); v *= e; }
+  const total = t + 0.25;
+  const heightAt = tt => {
+    if (tt < tFall) return h - 0.5 * g * tt * tt;
+    for (let i = 0; i < imps.length - 1; i++) if (tt < imps[i + 1]) { const vv = Math.sqrt(2 * g * h) * Math.pow(e, i + 1), dt = tt - imps[i]; return Math.max(0, vv * dt - 0.5 * g * dt * dt); }
+    return 0;
+  };
+  const X = tt => x0 + (x1 - x0) * Math.min(1, tt / total);
+  const ball = $('#hBall'), body = $('#hBody'), shadow = $('#hShadow'), trail = $('#hTrail'), bars = $('#hBars');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pathTo = upto => { let d = ''; for (let k = 0; k <= 200; k++) { const tt = upto * k / 200; const px = X(tt), py = floorY - R - heightAt(tt) * Hpx; d += (k ? 'L' : 'M') + px.toFixed(1) + ' ' + py.toFixed(1); } return d; };
+  const barsTo = upto => imps.filter(i => i <= upto).map(i => `<rect x="${(X(i) - 1.6).toFixed(1)}" y="${floorY + 27}" width="3.2" height="22" rx="1.6" fill="var(--accent)"/>`).join('');
+  const place = tt => {
+    const hh = heightAt(tt), px = X(tt), py = floorY - R - hh * Hpx;
+    const near = imps.some(i => Math.abs(tt - i) < 0.03);
+    ball.setAttribute('transform', `translate(${px.toFixed(1)},0)`);
+    body.setAttribute('transform', `translate(0,${(py + (near ? 2 : 0)).toFixed(1)}) scale(${near ? 1.08 : 1},${near ? 0.86 : 1})`);
+    shadow.setAttribute('opacity', (0.22 - Math.min(0.17, hh * 0.17)).toFixed(2));
+  };
+  if (reduce) { trail.setAttribute('d', pathTo(total)); bars.innerHTML = barsTo(total); place(total); return; }
+  let start = null;
+  const loop = now => {
+    if (start === null) start = now;
+    const tt = (now - start) / 1000;
+    if (tt <= total) { place(tt); trail.setAttribute('d', pathTo(tt)); bars.innerHTML = barsTo(tt); }
+    if (tt > total + 2.2) start = now;
+    if (!document.hidden && $('#v-home').classList.contains('on')) requestAnimationFrame(loop); else { heroLoop = loop; }
+  };
+  heroLoop = loop; requestAnimationFrame(loop);
+}
+let heroLoop = null;
+
+/* ---------------- routing ---------------- */
+const VIEWS = ['home', 'check', 'compare', 'test', 'data', 'about'];
+function route() {
+  const v = (location.hash || '#home').slice(1).split('?')[0];
+  const view = VIEWS.includes(v) ? v : 'home';
+  VIEWS.forEach(n => $('#v-' + n).classList.toggle('on', n === view));
+  $$('.tabbar a').forEach(a => { if (a.dataset.tab === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  syncBanners();
+  if (view === 'compare') renderCompare();
+  if (view === 'data') renderData();
+  if (view === 'home' && heroLoop) requestAnimationFrame(heroLoop);
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(rerenderCharts, 150); });
+
+function pubLine() {
+  const el = $('#pubLine'); if (!el) return;
+  el.textContent = S.published ? `Published set on this website: ${S.published.references.length} reference drops and ${(S.published.tests || []).length} held-out test recordings.` : 'No recordings are published on this website yet. Until then you can make your own on the Data tab, or try the example data on the Test tab.';
+}
+/* ---------------- boot ---------------- */
+$('#appVer').textContent = VER;
+pubLine();
+applyTheme(localStorage.getItem('bb.theme') || 'auto');
+hero();
+route();
+fetch('data/bounce_data.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
+  if (j && Array.isArray(j.references) && j.references.length) { S.published = j; if (!S.src) S.src = 'published'; pubLine(); if ($('#v-compare').classList.contains('on')) renderCompare(); }
+}).catch(() => {});
+window.BB = { S, B, showResult, makeDemo, sources, version: VER };
+})();
+</script>
+</body>
+</html>
